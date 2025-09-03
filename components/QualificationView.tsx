@@ -44,12 +44,14 @@ const QualificationView: React.FC<QualificationViewProps> = ({ participants, set
   useEffect(() => {
     if (!currentSessionId) return;
 
-    // Connect to the real-time channel using Server-Sent Events
-    const eventSource = new EventSource(`https://n-8.io/dmec-${currentSessionId}`);
+    // Connect to the real-time channel using Server-Sent Events with a reliable service
+    const eventSource = new EventSource(`https://ntfy.sh/dmec-${currentSessionId}/sse`);
 
     const handleMessage = (event: MessageEvent) => {
         try {
-            const encodedState = event.data;
+            // ntfy.sh wraps the message in a JSON object
+            const data = JSON.parse(event.data);
+            const encodedState = data.message;
             if (encodedState) {
                 const decoded = decodeState(encodedState);
                 if (decoded) {

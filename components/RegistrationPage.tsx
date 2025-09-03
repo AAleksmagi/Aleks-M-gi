@@ -57,10 +57,9 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState, sessi
     const encodedState = encodeState(newState);
     
     try {
-        await fetch(`https://n-8.io/dmec-${sessionId}`, {
+        await fetch(`https://ntfy.sh/dmec-${sessionId}`, {
             method: 'POST',
             body: encodedState,
-            headers: { 'Content-Type': 'text/plain' }
         });
     } catch (fetchError) {
         console.error("Failed to send registration update:", fetchError);
