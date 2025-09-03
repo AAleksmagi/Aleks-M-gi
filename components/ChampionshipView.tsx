@@ -44,7 +44,7 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
     onResetChampionship 
 }) => {
     const [newName, setNewName] = useState('');
-    const [seasonLengthInput, setSeasonLengthInput] = useState('');
+    const [seasonLengthInput, setSeasonLengthInput] = useState(totalCompetitions?.toString() || '');
 
     const addParticipant = () => {
         if (newName.trim()) {
@@ -163,7 +163,7 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
 
     return (
         <div className="max-w-7xl mx-auto bg-gray-800 p-6 rounded-lg shadow-xl">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                  <h2 className="text-2xl font-bold text-yellow-300">
                     {isSeasonFinished ? 'Hooaja lõplik edetabel' : 'Meistrivõistluste edetabel'}
                 </h2>

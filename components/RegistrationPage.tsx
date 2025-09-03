@@ -1,25 +1,15 @@
 import React, { useState } from 'react';
 import type { ChampionshipStanding } from '../types';
 
-interface AppState {
+interface RegistrationState {
   standings: ChampionshipStanding[];
   competitionsHeld: number;
 }
 
 interface RegistrationPageProps {
-  initialState: AppState;
+  initialState: RegistrationState;
   sessionId: string;
 }
-
-const encodeState = (state: AppState): string => {
-  try {
-    const json = JSON.stringify(state);
-    return btoa(json);
-  } catch (error) {
-    console.error("Failed to encode state:", error);
-    return '';
-  }
-};
 
 const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState, sessionId }) => {
   const [name, setName] = useState('');
@@ -49,17 +39,12 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState, sessi
       pointsPerCompetition: Array(initialState.competitionsHeld).fill(0),
     };
 
-    const newState: AppState = {
-      ...initialState,
-      standings: [...initialState.standings, newParticipant],
-    };
-
-    const encodedState = encodeState(newState);
+    const newParticipantJson = JSON.stringify(newParticipant);
     
     try {
         await fetch(`https://ntfy.sh/dmec-${sessionId}`, {
             method: 'POST',
-            body: encodedState,
+            body: newParticipantJson,
         });
     } catch (fetchError) {
         console.error("Failed to send registration update:", fetchError);

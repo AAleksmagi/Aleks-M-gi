@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Participant, ChampionshipStanding } from '../types';
 import { MIN_PARTICIPANTS } from '../constants';
 
@@ -9,13 +9,16 @@ interface QualificationViewProps {
   championshipStandings: ChampionshipStanding[];
   setChampionshipStandings: React.Dispatch<React.SetStateAction<ChampionshipStanding[]>>;
   competitionsHeld: number;
+  sessionId: string | null;
+  setSessionId: (id: string) => void;
 }
-interface AppState {
+
+interface RegistrationState {
   standings: ChampionshipStanding[];
   competitionsHeld: number;
 }
 
-const encodeState = (state: AppState): string => {
+const encodeState = (state: RegistrationState): string => {
   try {
     const json = JSON.stringify(state);
     return btoa(json);
@@ -25,38 +28,37 @@ const encodeState = (state: AppState): string => {
   }
 };
 
-const decodeState = (encoded: string): AppState | null => {
-  try {
-    const json = atob(encoded);
-    return JSON.parse(json) as AppState;
-  } catch (error) {
-    console.error("Failed to decode state:", error);
-    return null;
-  }
-};
 
-
-const QualificationView: React.FC<QualificationViewProps> = ({ participants, setParticipants, onStartBracket, championshipStandings, setChampionshipStandings, competitionsHeld }) => {
+const QualificationView: React.FC<QualificationViewProps> = ({ 
+    participants, 
+    setParticipants, 
+    onStartBracket, 
+    championshipStandings, 
+    setChampionshipStandings, 
+    competitionsHeld,
+    sessionId,
+    setSessionId
+}) => {
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [registrationUrl, setRegistrationUrl] = useState('');
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!currentSessionId) return;
+    if (!sessionId) return;
 
-    // Connect to the real-time channel using Server-Sent Events with a reliable service
-    const eventSource = new EventSource(`https://ntfy.sh/dmec-${currentSessionId}/sse`);
+    const eventSource = new EventSource(`https://ntfy.sh/dmec-${sessionId}/sse`);
 
     const handleMessage = (event: MessageEvent) => {
         try {
-            // ntfy.sh wraps the message in a JSON object
             const data = JSON.parse(event.data);
-            const encodedState = data.message;
-            if (encodedState) {
-                const decoded = decodeState(encodedState);
-                if (decoded) {
-                    setChampionshipStandings(decoded.standings);
-                }
+            const newParticipant = JSON.parse(data.message) as ChampionshipStanding;
+            
+            if (newParticipant && newParticipant.id && newParticipant.name) {
+                setChampionshipStandings(prev => {
+                    if (prev.some(p => p.id === newParticipant.id || p.name.toLowerCase() === newParticipant.name.toLowerCase())) {
+                        return prev;
+                    }
+                    return [...prev, newParticipant];
+                });
             }
         } catch (error) {
             console.error("Failed to process message from server:", error);
@@ -65,22 +67,23 @@ const QualificationView: React.FC<QualificationViewProps> = ({ participants, set
 
     eventSource.addEventListener('message', handleMessage);
 
-    // Clean up the connection when the component unmounts or the session ID changes
     return () => {
         eventSource.removeEventListener('message', handleMessage);
         eventSource.close();
     };
-}, [currentSessionId, setChampionshipStandings]);
+}, [sessionId, setChampionshipStandings]);
 
 
   const openRegistrationModal = () => {
-    // Generate a unique session ID for this registration link
-    const sessionId = Date.now().toString(36) + Math.random().toString(36).substring(2);
-    setCurrentSessionId(sessionId);
+    let currentId = sessionId;
+    if (!currentId) {
+      currentId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+      setSessionId(currentId);
+    }
     
-    const state: AppState = { standings: championshipStandings, competitionsHeld };
+    const state: RegistrationState = { standings: championshipStandings, competitionsHeld };
     const encodedState = encodeState(state);
-    const url = `${window.location.origin}${window.location.pathname}#registration/${sessionId}/${encodedState}`;
+    const url = `${window.location.origin}${window.location.pathname}#registration/${currentId}/${encodedState}`;
     setRegistrationUrl(url);
     setIsRegistrationModalOpen(true);
   };
@@ -117,7 +120,7 @@ const QualificationView: React.FC<QualificationViewProps> = ({ participants, set
         {participants.length === 0 && (
           <p className="text-center text-gray-500 py-8">Osalejaid pole veel. Lisa neid edetabeli vaates või ava registreerimine lingiga.</p>
         )}
-        {participants.map((p) => {
+        {participants.sort((a,b) => a.name.localeCompare(b.name)).map((p) => {
           const isMissingScore = p.score === null;
           return (
             <div key={p.id} className={`flex items-center gap-4 p-3 rounded-md transition-colors duration-300 ${isMissingScore ? 'bg-red-900/50' : 'bg-gray-700'}`}>

@@ -7,19 +7,53 @@ import ChampionshipView from './components/ChampionshipView';
 import RegistrationPage from './components/RegistrationPage';
 
 interface AppState {
+  phase: AppPhase;
   standings: ChampionshipStanding[];
+  competitionParticipants: Participant[];
+  bracket: BracketData;
+  thirdPlaceMatch: Match | null;
+  totalCompetitions: number | null;
   competitionsHeld: number;
+  sessionId: string | null;
 }
 
 interface RegistrationInfo {
-  initialState: AppState;
+  initialState: {
+    standings: ChampionshipStanding[];
+    competitionsHeld: number;
+  };
   sessionId: string;
 }
 
-const decodeState = (encoded: string): AppState | null => {
+const LOCAL_STORAGE_KEY = 'dmec-championship-state';
+
+const getInitialState = (): AppState => {
+  const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (savedState) {
+    try {
+      return JSON.parse(savedState);
+    } catch (e) {
+      console.error("Salvestatud oleku lugemine ebaõnnestus", e);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    }
+  }
+  return {
+    phase: AppPhase.CHAMPIONSHIP_VIEW,
+    standings: [],
+    competitionParticipants: [],
+    bracket: [],
+    thirdPlaceMatch: null,
+    totalCompetitions: null,
+    competitionsHeld: 0,
+    sessionId: null,
+  };
+};
+
+
+const decodeRegistrationState = (encoded: string): RegistrationInfo['initialState'] | null => {
   try {
     const json = atob(encoded);
-    return JSON.parse(json) as AppState;
+    return JSON.parse(json);
   } catch (error) {
     console.error("Failed to decode state:", error);
     return null;
@@ -32,7 +66,7 @@ const getRegistrationInfoFromURL = (): RegistrationInfo | null => {
     if (parts.length >= 2) {
       const sessionId = parts[0];
       const encodedState = parts.slice(1).join('/');
-      const initialState = decodeState(encodedState);
+      const initialState = decodeRegistrationState(encodedState);
       if (initialState && sessionId) {
         return { initialState, sessionId };
       }
@@ -43,22 +77,37 @@ const getRegistrationInfoFromURL = (): RegistrationInfo | null => {
 
 
 const App: React.FC = () => {
-  const [phase, setPhase] = useState<AppPhase>(AppPhase.CHAMPIONSHIP_VIEW);
-  const [championshipStandings, setChampionshipStandings] = useState<ChampionshipStanding[]>([]);
-  const [competitionParticipants, setCompetitionParticipants] = useState<Participant[]>([]);
-  const [bracket, setBracket] = useState<BracketData>([]);
-  const [thirdPlaceMatch, setThirdPlaceMatch] = useState<Match | null>(null);
+  const [appState, setAppState] = useState<AppState>(getInitialState);
 
-  const [totalCompetitions, setTotalCompetitions] = useState<number | null>(null);
-  const [competitionsHeld, setCompetitionsHeld] = useState<number>(0);
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appState));
+  }, [appState]);
+  
+  const { phase, standings, competitionParticipants, bracket, thirdPlaceMatch, totalCompetitions, competitionsHeld, sessionId } = appState;
 
   const [registrationInfo] = useState(getRegistrationInfoFromURL());
+  
+  const setPhase = (newPhase: AppPhase) => setAppState(prev => ({...prev, phase: newPhase}));
+  const setStandings = (updater: React.SetStateAction<ChampionshipStanding[]>) => {
+     setAppState(prev => {
+        const newStandings = typeof updater === 'function' ? (updater as (prevState: ChampionshipStanding[]) => ChampionshipStanding[])(prev.standings) : updater;
+        return { ...prev, standings: newStandings };
+    });
+  };
+   const setCompetitionParticipants = (updater: React.SetStateAction<Participant[]>) => {
+     setAppState(prev => {
+        const newParticipants = typeof updater === 'function' ? (updater as (prevState: Participant[]) => Participant[])(prev.competitionParticipants) : updater;
+        return { ...prev, competitionParticipants: newParticipants };
+    });
+  };
+  const setSessionId = (newSessionId: string) => setAppState(prev => ({ ...prev, sessionId: newSessionId }));
+
 
   useEffect(() => {
     if (phase === AppPhase.QUALIFICATION) {
         const existingParticipantIds = new Set(competitionParticipants.map(p => p.id));
         
-        const newParticipants = championshipStandings
+        const newParticipants = standings
             .filter(standing => !existingParticipantIds.has(standing.id))
             .map(s => ({
                 id: s.id,
@@ -71,21 +120,24 @@ const App: React.FC = () => {
             setCompetitionParticipants(prev => [...prev, ...newParticipants].sort((a,b) => a.name.localeCompare(b.name)));
         }
     }
-  }, [championshipStandings, phase, competitionParticipants]);
+  }, [standings, phase]);
 
 
   const handleStartCompetition = useCallback(() => {
-    const participantsForCompetition = championshipStandings.map(p => ({
+    const participantsForCompetition = standings.map(p => ({
       id: p.id,
       name: p.name,
       score: null,
       seed: 0,
     }));
-    setCompetitionParticipants(participantsForCompetition);
-    setBracket([]);
-    setThirdPlaceMatch(null);
-    setPhase(AppPhase.QUALIFICATION);
-  }, [championshipStandings]);
+    setAppState(prev => ({
+      ...prev,
+      competitionParticipants: participantsForCompetition,
+      bracket: [],
+      thirdPlaceMatch: null,
+      phase: AppPhase.QUALIFICATION,
+    }));
+  }, [standings]);
 
   const handleStartBracket = useCallback((allParticipants: Participant[]) => {
     const qualifiedParticipants = allParticipants
@@ -122,92 +174,55 @@ const App: React.FC = () => {
     for (let i = 0; i < finalSeedOrder.length; i += 2) {
       const p1Seed = finalSeedOrder[i];
       const p2Seed = finalSeedOrder[i + 1];
-
       const participant1 = participantMap.get(p1Seed) || null;
       const participant2 = participantMap.get(p2Seed) || null;
-
       let winner = null;
-      if (participant1 && !participant2) {
-        winner = participant1;
-      } else if (!participant1 && participant2) {
-        winner = participant2;
-      }
-
-      firstRound.push({
-        id: matchIdCounter++,
-        roundIndex: 0,
-        matchIndex: i / 2,
-        participant1,
-        participant2,
-        winner,
-        nextMatchId: null,
-      });
+      if (participant1 && !participant2) winner = participant1;
+      else if (!participant1 && participant2) winner = participant2;
+      firstRound.push({ id: matchIdCounter++, roundIndex: 0, matchIndex: i / 2, participant1, participant2, winner, nextMatchId: null });
     }
     newBracket.push(firstRound);
 
     let numMatchesInPreviousRound = bracketSize / 2;
     const numRounds = Math.log2(bracketSize);
-
     for (let roundIndex = 1; roundIndex < numRounds; roundIndex++) {
       const previousRound = newBracket[roundIndex - 1];
       const numMatchesInCurrentRound = numMatchesInPreviousRound / 2;
       const currentRound: Match[] = [];
-
       for (let matchIndex = 0; matchIndex < numMatchesInCurrentRound; matchIndex++) {
         let p1 = previousRound[matchIndex * 2]?.winner;
         let p2 = previousRound[matchIndex * 2 + 1]?.winner;
-
-        if (p1 && p2 && p1.seed > p2.seed) {
-            [p1, p2] = [p2, p1];
-        }
-
-        currentRound.push({
-          id: matchIdCounter++,
-          roundIndex,
-          matchIndex,
-          participant1: p1 || null,
-          participant2: p2 || null,
-          winner: null,
-          nextMatchId: null,
-        });
+        if (p1 && p2 && p1.seed > p2.seed) [p1, p2] = [p2, p1];
+        currentRound.push({ id: matchIdCounter++, roundIndex, matchIndex, participant1: p1 || null, participant2: p2 || null, winner: null, nextMatchId: null });
       }
-
       for (let i = 0; i < previousRound.length; i++) {
         previousRound[i].nextMatchId = currentRound[Math.floor(i / 2)].id;
       }
-
       newBracket.push(currentRound);
       numMatchesInPreviousRound = numMatchesInCurrentRound;
     }
-
-    setBracket(newBracket);
-    setPhase(AppPhase.BRACKET);
+    setAppState(prev => ({...prev, bracket: newBracket, phase: AppPhase.BRACKET}));
   }, []);
 
   const handleSetWinner = useCallback((matchId: number, winner: Participant) => {
-    if (thirdPlaceMatch && matchId === thirdPlaceMatch.id) {
-        setThirdPlaceMatch(prevMatch => {
-            if (prevMatch) {
-                const newMatch = { ...prevMatch, winner };
-                const finalMatch = bracket[bracket.length - 1]?.[0];
-                if (finalMatch?.winner) {
-                    setPhase(AppPhase.FINISHED);
-                }
-                return newMatch;
-            }
-            return null;
-        });
-        return;
-    }
+    setAppState(prev => {
+        let newThirdPlaceMatch = prev.thirdPlaceMatch;
+        let newBracket = JSON.parse(JSON.stringify(prev.bracket));
+        let newPhase = prev.phase;
 
-    setBracket(prevBracket => {
-        const newBracket = JSON.parse(JSON.stringify(prevBracket));
+        if (newThirdPlaceMatch && matchId === newThirdPlaceMatch.id) {
+            newThirdPlaceMatch = { ...newThirdPlaceMatch, winner };
+            const finalMatch = newBracket[newBracket.length - 1]?.[0];
+            if (finalMatch?.winner) {
+                newPhase = AppPhase.FINISHED;
+            }
+            return {...prev, thirdPlaceMatch: newThirdPlaceMatch, phase: newPhase };
+        }
+
         let matchToUpdate: Match | null = null;
         let roundIndexOfMatch = -1;
-        
         for (let i = 0; i < newBracket.length; i++) {
-            const round = newBracket[i];
-            const foundMatch = round.find(m => m.id === matchId);
+            const foundMatch = newBracket[i].find(m => m.id === matchId);
             if (foundMatch) {
                 matchToUpdate = foundMatch;
                 roundIndexOfMatch = i;
@@ -217,155 +232,104 @@ const App: React.FC = () => {
 
         if (matchToUpdate && !matchToUpdate.winner) {
             matchToUpdate.winner = winner;
-
             if (matchToUpdate.nextMatchId !== null) {
                 let nextMatch: Match | null = null;
                 for (const round of newBracket) {
                     nextMatch = round.find(m => m.id === matchToUpdate.nextMatchId) || null;
                     if (nextMatch) break;
                 }
-
                 if (nextMatch) {
-                    if (matchToUpdate.matchIndex % 2 === 0) {
-                        nextMatch.participant1 = winner;
-                    } else {
-                        nextMatch.participant2 = winner;
-                    }
-
-                    if (nextMatch.participant1 && nextMatch.participant2) {
-                        if (nextMatch.participant1.seed > nextMatch.participant2.seed) {
-                            [nextMatch.participant1, nextMatch.participant2] = [nextMatch.participant2, nextMatch.participant1];
-                        }
+                    if (matchToUpdate.matchIndex % 2 === 0) nextMatch.participant1 = winner;
+                    else nextMatch.participant2 = winner;
+                    if (nextMatch.participant1 && nextMatch.participant2 && nextMatch.participant1.seed > nextMatch.participant2.seed) {
+                        [nextMatch.participant1, nextMatch.participant2] = [nextMatch.participant2, nextMatch.participant1];
                     }
                 }
             } else {
-                if (thirdPlaceMatch?.winner || bracket.length <= 1) {
-                    setPhase(AppPhase.FINISHED);
+                if (newThirdPlaceMatch?.winner || newBracket.length <= 1) {
+                    newPhase = AppPhase.FINISHED;
                 }
             }
-            
             const numRounds = newBracket.length;
             if (numRounds > 1 && roundIndexOfMatch === numRounds - 2) {
                 const semiFinals = newBracket[numRounds - 2];
                 if (semiFinals[0]?.winner && semiFinals[1]?.winner) {
                     const loser1 = semiFinals[0].participant1?.id === semiFinals[0].winner.id ? semiFinals[0].participant2 : semiFinals[0].participant1;
                     const loser2 = semiFinals[1].participant1?.id === semiFinals[1].winner.id ? semiFinals[1].participant2 : semiFinals[1].participant1;
-                    
                     if (loser1 && loser2) {
                         const p1 = loser1.seed < loser2.seed ? loser1 : loser2;
                         const p2 = loser1.seed < loser2.seed ? loser2 : loser1;
-                        setThirdPlaceMatch({
-                            id: 999,
-                            roundIndex: -1,
-                            matchIndex: 0,
-                            participant1: p1,
-                            participant2: p2,
-                            winner: null,
-                            nextMatchId: null,
-                        });
+                        newThirdPlaceMatch = { id: 999, roundIndex: -1, matchIndex: 0, participant1: p1, participant2: p2, winner: null, nextMatchId: null };
                     }
                 }
             }
         }
-        
-        return newBracket;
+        return { ...prev, bracket: newBracket, thirdPlaceMatch: newThirdPlaceMatch, phase: newPhase };
     });
-  }, [bracket, thirdPlaceMatch]);
+  }, []);
 
   const calculateAndApplyPoints = useCallback(() => {
-    const pointsToAdd = new Map<number, number>();
-    championshipStandings.forEach(p => pointsToAdd.set(p.id, 0));
+    setAppState(prev => {
+        const { standings, competitionParticipants, bracket, thirdPlaceMatch } = prev;
+        const pointsToAdd = new Map<number, number>();
+        standings.forEach(p => pointsToAdd.set(p.id, 0));
 
-    // 1. Qualification points
-    const qualified = competitionParticipants
-      .filter(p => p.score !== null && p.score > 0)
-      .sort((a, b) => (b.score as number) - (a.score as number));
-    
-    qualified.forEach((p, index) => {
-      const rank = index + 1;
-      let points = 0;
-      if (rank === 1) points = 12;
-      else if (rank === 2) points = 10;
-      else if (rank === 3) points = 8;
-      else if (rank === 4) points = 6;
-      else if (rank >= 5 && rank <= 6) points = 4;
-      else if (rank >= 7 && rank <= 8) points = 3;
-      else if (rank >= 9 && rank <= 12) points = 2;
-      else if (rank >= 13 && rank <= 16) points = 1;
-      else if (rank >= 17 && rank <= 24) points = 0.5;
-      else if (rank >= 25 && rank <= 32) points = 0.25;
-
-      pointsToAdd.set(p.id, (pointsToAdd.get(p.id) || 0) + points);
-    });
-
-    // 2. Main competition points
-    const numRounds = bracket.length;
-    const finalMatch = bracket[numRounds - 1]?.[0];
-
-    const winner = finalMatch?.winner;
-    const runnerUp = finalMatch?.participant1?.id === winner?.id ? finalMatch?.participant2 : finalMatch?.participant1;
-    const thirdPlace = thirdPlaceMatch?.winner;
-    const fourthPlace = thirdPlaceMatch?.participant1?.id === thirdPlace?.id ? thirdPlaceMatch?.participant2 : thirdPlaceMatch?.participant1;
-
-    if (winner) pointsToAdd.set(winner.id, (pointsToAdd.get(winner.id) || 0) + 100);
-    if (runnerUp) pointsToAdd.set(runnerUp.id, (pointsToAdd.get(runnerUp.id) || 0) + 88);
-    if (thirdPlace) pointsToAdd.set(thirdPlace.id, (pointsToAdd.get(thirdPlace.id) || 0) + 76);
-    if (fourthPlace) pointsToAdd.set(fourthPlace.id, (pointsToAdd.get(fourthPlace.id) || 0) + 64);
-
-    const pointMapping = [
-      { roundParticipants: 8, points: 48 },   // 5-8th place
-      { roundParticipants: 16, points: 32 },  // 9-16th place
-      { roundParticipants: 32, points: 16 },  // 17-32nd place
-      { roundParticipants: 64, points: 10 },  // 33-64th place
-    ];
-
-    const top4Ids = new Set([winner?.id, runnerUp?.id, thirdPlace?.id, fourthPlace?.id].filter(Boolean));
-
-    for (const mapping of pointMapping) {
-      // Find the round where losers for this tier were determined.
-      // e.g., for top 8 losers (5-8th), we need the quarter-final round (4 matches).
-      const roundIndex = bracket.findIndex(r => r.length * 2 === mapping.roundParticipants);
-      
-      if (roundIndex !== -1) {
-        const round = bracket[roundIndex];
-        round.forEach(match => {
-          const loser = match.winner?.id === match.participant1?.id ? match.participant2 : match.participant1;
-          if (loser && !top4Ids.has(loser.id)) {
-            pointsToAdd.set(loser.id, (pointsToAdd.get(loser.id) || 0) + mapping.points);
-          }
+        const qualified = competitionParticipants.filter(p => p.score !== null && p.score > 0).sort((a, b) => (b.score as number) - (a.score as number));
+        qualified.forEach((p, index) => {
+            const rank = index + 1;
+            let points = 0;
+            if (rank === 1) points = 12; else if (rank === 2) points = 10; else if (rank === 3) points = 8; else if (rank === 4) points = 6;
+            else if (rank >= 5 && rank <= 6) points = 4; else if (rank >= 7 && rank <= 8) points = 3; else if (rank >= 9 && rank <= 12) points = 2;
+            else if (rank >= 13 && rank <= 16) points = 1; else if (rank >= 17 && rank <= 24) points = 0.5; else if (rank >= 25 && rank <= 32) points = 0.25;
+            pointsToAdd.set(p.id, (pointsToAdd.get(p.id) || 0) + points);
         });
-      }
-    }
 
-    setChampionshipStandings(prev => {
-      const newStandings = prev.map(standing => {
-        const pointsForThisCompetition = pointsToAdd.get(standing.id) || 0;
-        return {
-          ...standing,
-          pointsPerCompetition: [...standing.pointsPerCompetition, pointsForThisCompetition],
-        };
-      });
+        const finalMatch = bracket[bracket.length - 1]?.[0];
+        const winner = finalMatch?.winner;
+        const runnerUp = finalMatch?.participant1?.id === winner?.id ? finalMatch?.participant2 : finalMatch?.participant1;
+        const thirdPlace = thirdPlaceMatch?.winner;
+        const fourthPlace = thirdPlaceMatch?.participant1?.id === thirdPlace?.id ? thirdPlaceMatch?.participant2 : thirdPlaceMatch?.participant1;
+        if (winner) pointsToAdd.set(winner.id, (pointsToAdd.get(winner.id) || 0) + 100);
+        if (runnerUp) pointsToAdd.set(runnerUp.id, (pointsToAdd.get(runnerUp.id) || 0) + 88);
+        if (thirdPlace) pointsToAdd.set(thirdPlace.id, (pointsToAdd.get(thirdPlace.id) || 0) + 76);
+        if (fourthPlace) pointsToAdd.set(fourthPlace.id, (pointsToAdd.get(fourthPlace.id) || 0) + 64);
 
-      return newStandings.sort((a, b) => {
-        const totalA = a.pointsPerCompetition.reduce((sum, p) => sum + p, 0);
-        const totalB = b.pointsPerCompetition.reduce((sum, p) => sum + p, 0);
-        return totalB - totalA;
-      });
+        const pointMapping = [ { roundParticipants: 8, points: 48 }, { roundParticipants: 16, points: 32 }, { roundParticipants: 32, points: 16 }, { roundParticipants: 64, points: 10 }];
+        const top4Ids = new Set([winner?.id, runnerUp?.id, thirdPlace?.id, fourthPlace?.id].filter(Boolean));
+        for (const mapping of pointMapping) {
+            const roundIndex = bracket.findIndex(r => r.length * 2 === mapping.roundParticipants);
+            if (roundIndex !== -1) {
+                bracket[roundIndex].forEach(match => {
+                    const loser = match.winner?.id === match.participant1?.id ? match.participant2 : match.participant1;
+                    if (loser && !top4Ids.has(loser.id)) pointsToAdd.set(loser.id, (pointsToAdd.get(loser.id) || 0) + mapping.points);
+                });
+            }
+        }
+
+        const newStandings = standings.map(standing => ({
+            ...standing,
+            pointsPerCompetition: [...standing.pointsPerCompetition, pointsToAdd.get(standing.id) || 0],
+        }));
+        newStandings.sort((a, b) => b.pointsPerCompetition.reduce((s, p) => s + p, 0) - a.pointsPerCompetition.reduce((s, p) => s + p, 0));
+        return { ...prev, standings: newStandings };
     });
-  }, [competitionParticipants, bracket, thirdPlaceMatch, championshipStandings]);
+  }, []);
 
   const handleReturnToChampionship = useCallback(() => {
     calculateAndApplyPoints();
-    setCompetitionsHeld(prev => prev + 1);
-    setPhase(AppPhase.CHAMPIONSHIP_VIEW);
+    setAppState(prev => ({...prev, competitionsHeld: prev.competitionsHeld + 1, phase: AppPhase.CHAMPIONSHIP_VIEW}));
   }, [calculateAndApplyPoints]);
 
   const handleResetChampionship = useCallback(() => {
-    setChampionshipStandings(prev => prev.map(p => ({ ...p, pointsPerCompetition: [] })));
-    setCompetitionsHeld(0);
-    setTotalCompetitions(null);
-    setPhase(AppPhase.CHAMPIONSHIP_VIEW);
+    setAppState(prev => ({
+        ...getInitialState(),
+        totalCompetitions: null, // Reset total competitions to ask again
+    }));
   }, []);
+  
+   const handleSetTotalCompetitions = (count: number) => {
+    setAppState(prev => ({...prev, totalCompetitions: count}));
+  }
 
   if (registrationInfo) {
     return <RegistrationPage initialState={registrationInfo.initialState} sessionId={registrationInfo.sessionId} />;
@@ -381,11 +345,11 @@ const App: React.FC = () => {
       <main>
         {phase === AppPhase.CHAMPIONSHIP_VIEW && (
             <ChampionshipView 
-                standings={championshipStandings}
-                setStandings={setChampionshipStandings}
+                standings={standings}
+                setStandings={setStandings}
                 onStartCompetition={handleStartCompetition}
                 totalCompetitions={totalCompetitions}
-                setTotalCompetitions={setTotalCompetitions}
+                setTotalCompetitions={handleSetTotalCompetitions}
                 competitionsHeld={competitionsHeld}
                 onResetChampionship={handleResetChampionship}
             />
@@ -395,9 +359,11 @@ const App: React.FC = () => {
             participants={competitionParticipants} 
             setParticipants={setCompetitionParticipants}
             onStartBracket={handleStartBracket}
-            championshipStandings={championshipStandings}
-            setChampionshipStandings={setChampionshipStandings}
+            championshipStandings={standings}
+            setChampionshipStandings={setStandings}
             competitionsHeld={competitionsHeld}
+            sessionId={sessionId}
+            setSessionId={setSessionId}
           />
         )}
         {(phase === AppPhase.BRACKET || phase === AppPhase.FINISHED) && (
