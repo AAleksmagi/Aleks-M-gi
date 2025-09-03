@@ -261,7 +261,7 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
                         Alusta uut hooaega
                     </button>
                 ) : (
-                    <div className="flex justify-center items-center gap-4">
+                    <>
                         <button
                             onClick={onStartCompetition}
                             disabled={standings.length < 2}
@@ -269,18 +269,9 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
                         >
                             Alusta uut võistlust
                         </button>
-                        {(competitionsHeld > 0 || standings.length > 0) && (
-                            <button
-                                onClick={onResetChampionship}
-                                className="bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 text-sm"
-                            >
-                                Tagasi algusesse (Nulli hooaeg)
-                            </button>
-                        )}
-                        {standings.length < 2 && !((competitionsHeld > 0 || standings.length > 0)) && <p className="text-sm mt-2 text-gray-500">Võistluse alustamiseks on vaja vähemalt 2 osalejat.</p>}
-                    </div>
+                        {standings.length < 2 && <p className="text-sm mt-2 text-gray-500">Võistluse alustamiseks on vaja vähemalt 2 osalejat.</p>}
+                    </>
                 )}
-                 {standings.length < 2 && (competitionsHeld > 0 || standings.length > 0) && <p className="text-sm mt-2 text-gray-500">Võistluse alustamiseks on vaja vähemalt 2 osalejat.</p>}
             </div>
         </div>
     );

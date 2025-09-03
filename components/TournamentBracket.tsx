@@ -151,8 +151,6 @@ interface TournamentBracketProps {
   phase: AppPhase;
   onReturnToChampionship: () => void;
   participants: Participant[];
-  onReturnToQualification: () => void;
-  onReturnToChampionshipView: () => void;
 }
 
 const getRoundName = (numMatches: number) => {
@@ -171,8 +169,6 @@ const TournamentBracket: React.FC<TournamentBracketProps> = ({
     phase, 
     onReturnToChampionship, 
     participants,
-    onReturnToQualification,
-    onReturnToChampionshipView
 }) => {
     if (!bracketData || bracketData.length === 0) {
         return <p>Laen tabelit...</p>;
@@ -253,20 +249,6 @@ const TournamentBracket: React.FC<TournamentBracketProps> = ({
                         )}
                     </div>
                 </div>
-            </div>
-            <div className="mt-8 flex justify-center items-center gap-4 text-sm">
-                <button
-                onClick={onReturnToQualification}
-                className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300"
-                >
-                Tagasi kvalifikatsiooni
-                </button>
-                <button
-                onClick={onReturnToChampionshipView}
-                className="bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300"
-                >
-                Katkesta ja mine edetabelisse
-                </button>
             </div>
         </>
     );
