@@ -11,16 +11,6 @@ interface AppState {
   competitionsHeld: number;
 }
 
-const encodeState = (state: AppState): string => {
-  try {
-    const json = JSON.stringify(state);
-    return btoa(json);
-  } catch (error) {
-    console.error("Failed to encode state:", error);
-    return '';
-  }
-};
-
 const decodeState = (encoded: string): AppState | null => {
   try {
     const json = atob(encoded);
@@ -29,6 +19,14 @@ const decodeState = (encoded: string): AppState | null => {
     console.error("Failed to decode state:", error);
     return null;
   }
+};
+
+const getRegistrationStateFromURL = (): AppState | null => {
+  if (window.location.hash.startsWith('#registration/')) {
+    const encodedState = window.location.hash.substring(14);
+    return decodeState(encodedState);
+  }
+  return null;
 };
 
 
@@ -42,24 +40,7 @@ const App: React.FC = () => {
   const [totalCompetitions, setTotalCompetitions] = useState<number | null>(null);
   const [competitionsHeld, setCompetitionsHeld] = useState<number>(0);
 
-  const [registrationState, setRegistrationState] = useState<AppState | null>(null);
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      if (window.location.hash.startsWith('#registration/')) {
-        const encodedState = window.location.hash.substring(14);
-        const decoded = decodeState(encodedState);
-        setRegistrationState(decoded);
-      } else {
-        setRegistrationState(null);
-      }
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange(); // Initial check
-
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  const [initialRegistrationState] = useState(getRegistrationStateFromURL());
 
   useEffect(() => {
     if (phase === AppPhase.QUALIFICATION) {
@@ -75,10 +56,10 @@ const App: React.FC = () => {
             }));
 
         if (newParticipants.length > 0) {
-            setCompetitionParticipants(prev => [...prev, ...newParticipants]);
+            setCompetitionParticipants(prev => [...prev, ...newParticipants].sort((a,b) => a.name.localeCompare(b.name)));
         }
     }
-  }, [championshipStandings, phase]);
+  }, [championshipStandings, phase, competitionParticipants]);
 
 
   const handleStartCompetition = useCallback(() => {
@@ -374,8 +355,8 @@ const App: React.FC = () => {
     setPhase(AppPhase.CHAMPIONSHIP_VIEW);
   }, []);
 
-  if (registrationState) {
-    return <RegistrationPage initialState={registrationState} />;
+  if (initialRegistrationState) {
+    return <RegistrationPage initialState={initialRegistrationState} />;
   }
 
   return (

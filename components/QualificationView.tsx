@@ -40,26 +40,26 @@ const QualificationView: React.FC<QualificationViewProps> = ({ participants, set
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [registrationUrl, setRegistrationUrl] = useState('');
 
-  const handleHashChange = useCallback(() => {
-      if (window.location.hash.startsWith('#registration/')) {
-        const encodedState = window.location.hash.substring(14);
-        const decoded = decodeState(encodedState);
-        if (decoded && JSON.stringify(decoded.standings) !== JSON.stringify(championshipStandings)) {
-           setChampionshipStandings(decoded.standings);
+  useEffect(() => {
+    const handleStorageUpdate = (event: StorageEvent) => {
+      if (event.key === 'dmec-championship-update' && event.newValue) {
+        const decoded = decodeState(event.newValue);
+        if (decoded) {
+            setChampionshipStandings(currentStandings => {
+                if (JSON.stringify(decoded.standings) !== JSON.stringify(currentStandings)) {
+                    return decoded.standings;
+                }
+                return currentStandings;
+            });
         }
       }
-  }, [championshipStandings, setChampionshipStandings]);
-
-  useEffect(() => {
-    window.addEventListener('hashchange', handleHashChange);
-    // clean up url when navigating away
-    return () => {
-       window.removeEventListener('hashchange', handleHashChange);
-       if(window.location.hash.startsWith('#registration/')){
-         window.history.pushState("", document.title, window.location.pathname + window.location.search);
-       }
     };
-  }, [handleHashChange]);
+  
+    window.addEventListener('storage', handleStorageUpdate);
+    return () => {
+      window.removeEventListener('storage', handleStorageUpdate);
+    };
+  }, [setChampionshipStandings]);
 
 
   const openRegistrationModal = () => {

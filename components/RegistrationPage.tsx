@@ -54,9 +54,14 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState }) => 
     };
 
     const encodedState = encodeState(newState);
-    window.location.hash = `registration/${encodedState}`;
+    // Use localStorage to broadcast the update to the host's tab.
+    localStorage.setItem('dmec-championship-update', encodedState);
+    
     setIsRegistered(true);
     setError('');
+
+    // Clean up the URL for a better user experience after registration
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
   };
 
   return (
