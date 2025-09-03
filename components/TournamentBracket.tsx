@@ -151,6 +151,8 @@ interface TournamentBracketProps {
   phase: AppPhase;
   onReturnToChampionship: () => void;
   participants: Participant[];
+  onReturnToQualification: () => void;
+  onReturnToChampionshipView: () => void;
 }
 
 const getRoundName = (numMatches: number) => {
@@ -162,7 +164,16 @@ const getRoundName = (numMatches: number) => {
 };
 
 
-const TournamentBracket: React.FC<TournamentBracketProps> = ({ bracketData, thirdPlaceMatch, onSetWinner, phase, onReturnToChampionship, participants }) => {
+const TournamentBracket: React.FC<TournamentBracketProps> = ({ 
+    bracketData, 
+    thirdPlaceMatch, 
+    onSetWinner, 
+    phase, 
+    onReturnToChampionship, 
+    participants,
+    onReturnToQualification,
+    onReturnToChampionshipView
+}) => {
     if (!bracketData || bracketData.length === 0) {
         return <p>Laen tabelit...</p>;
     }
@@ -187,61 +198,77 @@ const TournamentBracket: React.FC<TournamentBracketProps> = ({ bracketData, thir
     const totalBracketHeightRem = (bracketData[0]?.length ?? 0) * MATCH_SLOT_HEIGHT_REM;
 
     return (
-        <div className="p-4 bg-gray-900/50 rounded-xl overflow-x-auto">
-            <div className="flex justify-start items-start">
-                {bracketData.map((round, roundIndex) => {
-                    if (roundIndex === bracketData.length - 1) return null; // Skip final round from this loop
+        <>
+            <div className="p-4 bg-gray-900/50 rounded-xl overflow-x-auto">
+                <div className="flex justify-start items-start">
+                    {bracketData.map((round, roundIndex) => {
+                        if (roundIndex === bracketData.length - 1) return null; // Skip final round from this loop
 
-                    const matchSlotHeight = MATCH_SLOT_HEIGHT_REM * Math.pow(2, roundIndex);
-                    const connectorSlotHeight = matchSlotHeight * 2;
+                        const matchSlotHeight = MATCH_SLOT_HEIGHT_REM * Math.pow(2, roundIndex);
+                        const connectorSlotHeight = matchSlotHeight * 2;
 
-                    return (
-                        <React.Fragment key={roundIndex}>
-                            {/* Round Column with Header */}
-                            <div className="flex flex-col px-2">
-                                <div className="h-10 flex items-end justify-center pb-2">
-                                    <h3 className="text-center font-bold text-blue-300">
-                                       {getRoundName(round.length)}
-                                    </h3>
+                        return (
+                            <React.Fragment key={roundIndex}>
+                                {/* Round Column with Header */}
+                                <div className="flex flex-col px-2">
+                                    <div className="h-10 flex items-end justify-center pb-2">
+                                        <h3 className="text-center font-bold text-blue-300">
+                                        {getRoundName(round.length)}
+                                        </h3>
+                                    </div>
+                                    {round.map((match) => (
+                                        <div key={match.id} style={{ height: `${matchSlotHeight}rem` }} className="flex items-center">
+                                            <MatchCard match={match} onSetWinner={onSetWinner} />
+                                        </div>
+                                    ))}
                                 </div>
-                                {round.map((match) => (
-                                    <div key={match.id} style={{ height: `${matchSlotHeight}rem` }} className="flex items-center">
-                                        <MatchCard match={match} onSetWinner={onSetWinner} />
-                                    </div>
-                                ))}
-                            </div>
-                            {/* Connectors Column */}
-                            <div className="flex flex-col">
-                                {/* Spacer for header */}
-                                <div className="h-10" />
-                                {Array.from({ length: round.length / 2 }).map((_, i) => (
-                                    <div key={i} style={{ height: `${connectorSlotHeight}rem` }} className="flex items-center">
-                                        <Connector />
-                                    </div>
-                                ))}
-                            </div>
-                        </React.Fragment>
-                    );
-                })}
+                                {/* Connectors Column */}
+                                <div className="flex flex-col">
+                                    {/* Spacer for header */}
+                                    <div className="h-10" />
+                                    {Array.from({ length: round.length / 2 }).map((_, i) => (
+                                        <div key={i} style={{ height: `${connectorSlotHeight}rem` }} className="flex items-center">
+                                            <Connector />
+                                        </div>
+                                    ))}
+                                </div>
+                            </React.Fragment>
+                        );
+                    })}
 
-                {/* Finals Column */}
-                <div className="flex flex-col justify-center items-center px-4" style={{ minHeight: `${totalBracketHeightRem}rem`}}>
-                     <div className="h-10 flex items-end justify-center pb-2">
-                        <h3 className="text-center font-bold text-yellow-400">Finaalid</h3>
-                    </div>
-                    {finalRound && finalRound.map((match) => (
-                        <MatchCard key={match.id} match={match} onSetWinner={onSetWinner} />
-                    ))}
-                    
-                    {thirdPlaceMatch && (
-                        <div className="mt-8">
-                            <div className="text-center font-bold mb-4 text-orange-400">3. koha mäng</div>
-                            <MatchCard match={thirdPlaceMatch} onSetWinner={onSetWinner} />
+                    {/* Finals Column */}
+                    <div className="flex flex-col justify-center items-center px-4" style={{ minHeight: `${totalBracketHeightRem}rem`}}>
+                        <div className="h-10 flex items-end justify-center pb-2">
+                            <h3 className="text-center font-bold text-yellow-400">Finaalid</h3>
                         </div>
-                    )}
+                        {finalRound && finalRound.map((match) => (
+                            <MatchCard key={match.id} match={match} onSetWinner={onSetWinner} />
+                        ))}
+                        
+                        {thirdPlaceMatch && (
+                            <div className="mt-8">
+                                <div className="text-center font-bold mb-4 text-orange-400">3. koha mäng</div>
+                                <MatchCard match={thirdPlaceMatch} onSetWinner={onSetWinner} />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
+            <div className="mt-8 flex justify-center items-center gap-4 text-sm">
+                <button
+                onClick={onReturnToQualification}
+                className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+                >
+                Tagasi kvalifikatsiooni
+                </button>
+                <button
+                onClick={onReturnToChampionshipView}
+                className="bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+                >
+                Katkesta ja mine edetabelisse
+                </button>
+            </div>
+        </>
     );
 };
 

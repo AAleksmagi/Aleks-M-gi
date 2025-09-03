@@ -323,15 +323,38 @@ const App: React.FC = () => {
   }, []);
 
   const handleResetChampionship = useCallback(() => {
-    setAppState(() => ({
-        ...getInitialState(),
-        totalCompetitions: null,
-    }));
+    if (window.confirm('Kas oled kindel? See kustutab kogu hooaja edenemise ja seda ei saa tagasi võtta.')) {
+        setAppState(() => ({
+            ...getInitialState(),
+            totalCompetitions: null,
+        }));
+    }
   }, []);
   
-   const handleSetTotalCompetitions = useCallback((count: number) => {
+  const handleSetTotalCompetitions = useCallback((count: number) => {
     setAppState(prev => ({...prev, totalCompetitions: count}));
   }, []);
+
+  const handleReturnToChampionshipView = useCallback(() => {
+      if (window.confirm('Kas oled kindel? Praeguse võistluse salvestamata andmed lähevad kaotsi.')) {
+        setAppState(prev => ({
+          ...prev,
+          phase: AppPhase.CHAMPIONSHIP_VIEW,
+        }));
+      }
+  }, []);
+
+  const handleReturnToQualification = useCallback(() => {
+      if (window.confirm('Kas oled kindel? See tühistab praeguse tabeli seisu ja pead selle uuesti genereerima.')) {
+        setAppState(prev => ({
+            ...prev,
+            phase: AppPhase.QUALIFICATION,
+            bracket: [],
+            thirdPlaceMatch: null,
+        }));
+      }
+  }, []);
+
 
   if (registrationInfo) {
     return <RegistrationPage initialState={registrationInfo.initialState} sessionId={registrationInfo.sessionId} />;
@@ -366,6 +389,8 @@ const App: React.FC = () => {
             competitionsHeld={competitionsHeld}
             sessionId={sessionId}
             setSessionId={setSessionId}
+            onReturnToChampionshipView={handleReturnToChampionshipView}
+            onResetChampionship={handleResetChampionship}
           />
         )}
         {(phase === AppPhase.BRACKET || phase === AppPhase.FINISHED) && (
@@ -376,6 +401,8 @@ const App: React.FC = () => {
             onSetWinner={handleSetWinner} 
             phase={phase}
             onReturnToChampionship={handleReturnToChampionship}
+            onReturnToQualification={handleReturnToQualification}
+            onReturnToChampionshipView={handleReturnToChampionshipView}
           />
         )}
       </main>

@@ -11,6 +11,8 @@ interface QualificationViewProps {
   competitionsHeld: number;
   sessionId: string | null;
   setSessionId: (id: string) => void;
+  onReturnToChampionshipView: () => void;
+  onResetChampionship: () => void;
 }
 
 interface RegistrationState {
@@ -37,7 +39,9 @@ const QualificationView: React.FC<QualificationViewProps> = ({
     setChampionshipStandings, 
     competitionsHeld,
     sessionId,
-    setSessionId
+    setSessionId,
+    onReturnToChampionshipView,
+    onResetChampionship,
 }) => {
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [registrationUrl, setRegistrationUrl] = useState('');
@@ -158,6 +162,22 @@ const QualificationView: React.FC<QualificationViewProps> = ({
           Genereeri tabel
         </button>
       </div>
+      
+      <div className="mt-6 flex justify-center gap-4 border-t border-gray-700 pt-6">
+        <button
+          onClick={onReturnToChampionshipView}
+          className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+        >
+          Tagasi edetabeli juurde
+        </button>
+        <button
+          onClick={onResetChampionship}
+          className="bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+        >
+          Tagasi algusesse
+        </button>
+      </div>
+
 
       {isRegistrationModalOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setIsRegistrationModalOpen(false)}>
