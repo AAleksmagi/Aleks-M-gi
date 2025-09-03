@@ -1,10 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AppPhase } from './constants';
 import type { Participant, BracketData, Match, ChampionshipStanding } from './types';
 import QualificationView from './components/QualificationView';
 import TournamentBracket from './components/TournamentBracket';
 import ChampionshipView from './components/ChampionshipView';
-import RegistrationPage from './components/RegistrationPage';
 
 interface AppState {
   phase: AppPhase;
@@ -14,29 +13,9 @@ interface AppState {
   thirdPlaceMatch: Match | null;
   totalCompetitions: number | null;
   competitionsHeld: number;
-  sessionId: string | null;
 }
-
-interface RegistrationInfo {
-  initialState: {
-    standings: ChampionshipStanding[];
-    competitionsHeld: number;
-  };
-  sessionId: string;
-}
-
-const LOCAL_STORAGE_KEY = 'dmec-championship-state';
 
 const getInitialState = (): AppState => {
-  const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (savedState) {
-    try {
-      return JSON.parse(savedState);
-    } catch (e) {
-      console.error("Salvestatud oleku lugemine ebaõnnestus", e);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    }
-  }
   return {
     phase: AppPhase.CHAMPIONSHIP_VIEW,
     standings: [],
@@ -45,47 +24,14 @@ const getInitialState = (): AppState => {
     thirdPlaceMatch: null,
     totalCompetitions: null,
     competitionsHeld: 0,
-    sessionId: null,
   };
-};
-
-
-const decodeRegistrationState = (encoded: string): RegistrationInfo['initialState'] | null => {
-  try {
-    const json = atob(encoded);
-    return JSON.parse(json);
-  } catch (error) {
-    console.error("Failed to decode state:", error);
-    return null;
-  }
-};
-
-const getRegistrationInfoFromURL = (): RegistrationInfo | null => {
-  if (window.location.hash.startsWith('#registration/')) {
-    const parts = window.location.hash.substring(14).split('/');
-    if (parts.length >= 2) {
-      const sessionId = parts[0];
-      const encodedState = parts.slice(1).join('/');
-      const initialState = decodeRegistrationState(encodedState);
-      if (initialState && sessionId) {
-        return { initialState, sessionId };
-      }
-    }
-  }
-  return null;
 };
 
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(getInitialState);
 
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appState));
-  }, [appState]);
-  
-  const { phase, standings, competitionParticipants, bracket, thirdPlaceMatch, totalCompetitions, competitionsHeld, sessionId } = appState;
-
-  const [registrationInfo] = useState(getRegistrationInfoFromURL());
+  const { phase, standings, competitionParticipants, bracket, thirdPlaceMatch, totalCompetitions, competitionsHeld } = appState;
   
   const setStandings = useCallback((updater: React.SetStateAction<ChampionshipStanding[]>) => {
      setAppState(prev => {
@@ -100,28 +46,6 @@ const App: React.FC = () => {
         return { ...prev, competitionParticipants: newParticipants };
     });
   }, []);
-
-  const setSessionId = useCallback((newSessionId: string) => setAppState(prev => ({ ...prev, sessionId: newSessionId })), []);
-
-
-  useEffect(() => {
-    if (phase === AppPhase.QUALIFICATION) {
-        const existingParticipantIds = new Set(competitionParticipants.map(p => p.id));
-        
-        const newParticipants = standings
-            .filter(standing => !existingParticipantIds.has(standing.id))
-            .map(s => ({
-                id: s.id,
-                name: s.name,
-                score: null,
-                seed: 0,
-            }));
-
-        if (newParticipants.length > 0) {
-            setCompetitionParticipants(prev => [...prev, ...newParticipants].sort((a,b) => a.name.localeCompare(b.name)));
-        }
-    }
-  }, [standings, phase, competitionParticipants, setCompetitionParticipants]);
 
 
   const handleStartCompetition = useCallback(() => {
@@ -323,19 +247,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleResetChampionship = useCallback(() => {
-    setAppState(() => ({
-        ...getInitialState(),
-        totalCompetitions: null,
-    }));
+    setAppState(getInitialState());
   }, []);
   
   const handleSetTotalCompetitions = useCallback((count: number) => {
     setAppState(prev => ({...prev, totalCompetitions: count}));
   }, []);
 
-  if (registrationInfo) {
-    return <RegistrationPage initialState={registrationInfo.initialState} sessionId={registrationInfo.sessionId} />;
-  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 sm:p-6 lg:p-8">
@@ -361,11 +279,6 @@ const App: React.FC = () => {
             participants={competitionParticipants} 
             setParticipants={setCompetitionParticipants}
             onStartBracket={handleStartBracket}
-            championshipStandings={standings}
-            setChampionshipStandings={setStandings}
-            competitionsHeld={competitionsHeld}
-            sessionId={sessionId}
-            setSessionId={setSessionId}
           />
         )}
         {(phase === AppPhase.BRACKET || phase === AppPhase.FINISHED) && (
