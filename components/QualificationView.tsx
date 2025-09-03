@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import type { Participant, ChampionshipStanding } from '../types';
 import { MIN_PARTICIPANTS } from '../constants';
 
@@ -6,60 +6,75 @@ interface QualificationViewProps {
   participants: Participant[];
   setParticipants: React.Dispatch<React.SetStateAction<Participant[]>>;
   onStartBracket: (participants: Participant[]) => void;
+  championshipStandings: ChampionshipStanding[];
   setChampionshipStandings: React.Dispatch<React.SetStateAction<ChampionshipStanding[]>>;
   competitionsHeld: number;
 }
+interface AppState {
+  standings: ChampionshipStanding[];
+  competitionsHeld: number;
+}
 
-const QualificationView: React.FC<QualificationViewProps> = ({ participants, setParticipants, onStartBracket, setChampionshipStandings, competitionsHeld }) => {
+const encodeState = (state: AppState): string => {
+  try {
+    const json = JSON.stringify(state);
+    return btoa(json);
+  } catch (error) {
+    console.error("Failed to encode state:", error);
+    return '';
+  }
+};
+
+const decodeState = (encoded: string): AppState | null => {
+  try {
+    const json = atob(encoded);
+    return JSON.parse(json) as AppState;
+  } catch (error) {
+    console.error("Failed to decode state:", error);
+    return null;
+  }
+};
+
+
+const QualificationView: React.FC<QualificationViewProps> = ({ participants, setParticipants, onStartBracket, championshipStandings, setChampionshipStandings, competitionsHeld }) => {
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
+  const [registrationUrl, setRegistrationUrl] = useState('');
+
+  const handleHashChange = useCallback(() => {
+      if (window.location.hash.startsWith('#registration/')) {
+        const encodedState = window.location.hash.substring(14);
+        const decoded = decodeState(encodedState);
+        if (decoded && JSON.stringify(decoded.standings) !== JSON.stringify(championshipStandings)) {
+           setChampionshipStandings(decoded.standings);
+        }
+      }
+  }, [championshipStandings, setChampionshipStandings]);
+
+  useEffect(() => {
+    window.addEventListener('hashchange', handleHashChange);
+    // clean up url when navigating away
+    return () => {
+       window.removeEventListener('hashchange', handleHashChange);
+       if(window.location.hash.startsWith('#registration/')){
+         window.history.pushState("", document.title, window.location.pathname + window.location.search);
+       }
+    };
+  }, [handleHashChange]);
+
+
+  const openRegistrationModal = () => {
+    const state: AppState = { standings: championshipStandings, competitionsHeld };
+    const encodedState = encodeState(state);
+    const url = `${window.location.origin}${window.location.pathname}#registration/${encodedState}`;
+    setRegistrationUrl(url);
+    setIsRegistrationModalOpen(true);
+  };
 
   const updateScore = (id: number, score: string) => {
     const scoreValue = score ? parseInt(score, 10) : null;
     setParticipants(prev =>
       prev.map(p => (p.id === id ? { ...p, score: isNaN(scoreValue as number) ? null : scoreValue } : p))
     );
-  };
-  
-  const generateMockParticipants = () => {
-    const mockData: {name: string; score: number}[] = [];
-     for (let i = 1; i <= 7; i++) {
-        mockData.push({
-            name: `Osaleja ${i}`,
-            score: Math.floor(Math.random() * 100) + 1,
-        });
-    }
-
-    setChampionshipStandings(prev => {
-        const existingNames = new Set(prev.map(p => p.name));
-        const newStandings = [...prev];
-        const participantsForCompetition = [...participants];
-        
-        mockData.forEach(mock => {
-            if (!existingNames.has(mock.name)) {
-                const newStanding = { 
-                    id: Date.now() + Math.random(), 
-                    name: mock.name, 
-                    pointsPerCompetition: Array(competitionsHeld).fill(0) 
-                };
-                newStandings.push(newStanding);
-                
-                const existingCompParticipant = participantsForCompetition.find(p => p.name === mock.name);
-                if (existingCompParticipant) {
-                    existingCompParticipant.score = mock.score;
-                } else {
-                     participantsForCompetition.push({ ...newStanding, score: mock.score, seed: 0 });
-                }
-
-            } else { // if exists, just update score
-                const participantToUpdate = participantsForCompetition.find(p => p.name === mock.name);
-                if (participantToUpdate) {
-                    participantToUpdate.score = mock.score;
-                }
-            }
-        });
-        
-        setParticipants(participantsForCompetition);
-        return newStandings;
-    });
   };
 
   const qualifiedCount = useMemo(() => {
@@ -70,20 +85,23 @@ const QualificationView: React.FC<QualificationViewProps> = ({ participants, set
 
   return (
     <div className="max-w-4xl mx-auto bg-gray-800 p-6 rounded-lg shadow-xl">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
         <h2 className="text-2xl font-bold text-blue-300">Kvalifikatsioon</h2>
         <button
-          onClick={generateMockParticipants}
+          onClick={openRegistrationModal}
           className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 whitespace-nowrap"
-          title="Genereerib testimiseks 7 osalejat ja lisab nad vajadusel sarja"
+          title="Genereerib lingi, mille kaudu saavad osalejad ise registreeruda"
         >
-          Genereeri testandmed
+          Ava registreerimine lingiga
         </button>
       </div>
       
-      <p className="mb-6 text-gray-400">Sisesta selle võistluse kvalifikatsiooni tulemused. Osalejate nimekirja saab muuta edetabeli vaates.</p>
+      <p className="mb-6 text-gray-400">Sisesta selle võistluse kvalifikatsiooni tulemused. Uusi osalejaid saab sarja lisada edetabeli vaates või jagades registreerimise linki.</p>
 
       <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+        {participants.length === 0 && (
+          <p className="text-center text-gray-500 py-8">Osalejaid pole veel. Lisa neid edetabeli vaates või ava registreerimine lingiga.</p>
+        )}
         {participants.map((p) => {
           const isMissingScore = p.score === null;
           return (
@@ -122,6 +140,46 @@ const QualificationView: React.FC<QualificationViewProps> = ({ participants, set
           Genereeri tabel
         </button>
       </div>
+
+      {isRegistrationModalOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setIsRegistrationModalOpen(false)}>
+          <div className="bg-gray-800 rounded-xl shadow-2xl p-8 max-w-lg w-full text-center" onClick={e => e.stopPropagation()}>
+            <h3 className="text-2xl font-bold text-yellow-300 mb-4">Jaga linki osalejatega</h3>
+            <p className="text-gray-400 mb-6">Osalejad saavad selle lingi või QR-koodi kaudu ennast võistlusele registreerida. Sinu nimekiri uueneb automaatselt.</p>
+            
+            <div className="bg-gray-900 p-4 rounded-lg mb-4">
+              <input 
+                type="text" 
+                readOnly 
+                value={registrationUrl}
+                className="w-full bg-gray-700 text-gray-300 border border-gray-600 rounded-md px-3 py-2 text-sm"
+                onFocus={e => e.target.select()}
+              />
+              <button 
+                onClick={() => navigator.clipboard.writeText(registrationUrl)}
+                className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-4 text-sm rounded-md transition duration-300"
+              >
+                Kopeeri link
+              </button>
+            </div>
+            
+            <div className="flex justify-center mb-6">
+               <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(registrationUrl)}&bgcolor=1F2937&color=FFFFFF&qzone=1`}
+                  alt="Registration QR Code"
+                  className="rounded-lg border-4 border-gray-700"
+                />
+            </div>
+            
+            <button
+              onClick={() => setIsRegistrationModalOpen(false)}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-md transition duration-300"
+            >
+              Sulge
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

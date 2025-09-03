@@ -1,9 +1,36 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AppPhase } from './constants';
 import type { Participant, BracketData, Match, ChampionshipStanding } from './types';
 import QualificationView from './components/QualificationView';
 import TournamentBracket from './components/TournamentBracket';
 import ChampionshipView from './components/ChampionshipView';
+import RegistrationPage from './components/RegistrationPage';
+
+interface AppState {
+  standings: ChampionshipStanding[];
+  competitionsHeld: number;
+}
+
+const encodeState = (state: AppState): string => {
+  try {
+    const json = JSON.stringify(state);
+    return btoa(json);
+  } catch (error) {
+    console.error("Failed to encode state:", error);
+    return '';
+  }
+};
+
+const decodeState = (encoded: string): AppState | null => {
+  try {
+    const json = atob(encoded);
+    return JSON.parse(json) as AppState;
+  } catch (error) {
+    console.error("Failed to decode state:", error);
+    return null;
+  }
+};
+
 
 const App: React.FC = () => {
   const [phase, setPhase] = useState<AppPhase>(AppPhase.CHAMPIONSHIP_VIEW);
@@ -14,6 +41,45 @@ const App: React.FC = () => {
 
   const [totalCompetitions, setTotalCompetitions] = useState<number | null>(null);
   const [competitionsHeld, setCompetitionsHeld] = useState<number>(0);
+
+  const [registrationState, setRegistrationState] = useState<AppState | null>(null);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash.startsWith('#registration/')) {
+        const encodedState = window.location.hash.substring(14);
+        const decoded = decodeState(encodedState);
+        setRegistrationState(decoded);
+      } else {
+        setRegistrationState(null);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange(); // Initial check
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (phase === AppPhase.QUALIFICATION) {
+        const existingParticipantIds = new Set(competitionParticipants.map(p => p.id));
+        
+        const newParticipants = championshipStandings
+            .filter(standing => !existingParticipantIds.has(standing.id))
+            .map(s => ({
+                id: s.id,
+                name: s.name,
+                score: null,
+                seed: 0,
+            }));
+
+        if (newParticipants.length > 0) {
+            setCompetitionParticipants(prev => [...prev, ...newParticipants]);
+        }
+    }
+  }, [championshipStandings, phase]);
+
 
   const handleStartCompetition = useCallback(() => {
     const participantsForCompetition = championshipStandings.map(p => ({
@@ -308,6 +374,10 @@ const App: React.FC = () => {
     setPhase(AppPhase.CHAMPIONSHIP_VIEW);
   }, []);
 
+  if (registrationState) {
+    return <RegistrationPage initialState={registrationState} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 sm:p-6 lg:p-8">
       <header className="text-center mb-8">
@@ -332,6 +402,7 @@ const App: React.FC = () => {
             participants={competitionParticipants} 
             setParticipants={setCompetitionParticipants}
             onStartBracket={handleStartBracket}
+            championshipStandings={championshipStandings}
             setChampionshipStandings={setChampionshipStandings}
             competitionsHeld={competitionsHeld}
           />
