@@ -87,20 +87,21 @@ const App: React.FC = () => {
 
   const [registrationInfo] = useState(getRegistrationInfoFromURL());
   
-  const setPhase = (newPhase: AppPhase) => setAppState(prev => ({...prev, phase: newPhase}));
-  const setStandings = (updater: React.SetStateAction<ChampionshipStanding[]>) => {
+  const setStandings = useCallback((updater: React.SetStateAction<ChampionshipStanding[]>) => {
      setAppState(prev => {
-        const newStandings = typeof updater === 'function' ? (updater as (prevState: ChampionshipStanding[]) => ChampionshipStanding[])(prev.standings) : updater;
+        const newStandings = typeof updater === 'function' ? updater(prev.standings) : updater;
         return { ...prev, standings: newStandings };
     });
-  };
-   const setCompetitionParticipants = (updater: React.SetStateAction<Participant[]>) => {
+  }, []);
+
+   const setCompetitionParticipants = useCallback((updater: React.SetStateAction<Participant[]>) => {
      setAppState(prev => {
-        const newParticipants = typeof updater === 'function' ? (updater as (prevState: Participant[]) => Participant[])(prev.competitionParticipants) : updater;
+        const newParticipants = typeof updater === 'function' ? updater(prev.competitionParticipants) : updater;
         return { ...prev, competitionParticipants: newParticipants };
     });
-  };
-  const setSessionId = (newSessionId: string) => setAppState(prev => ({ ...prev, sessionId: newSessionId }));
+  }, []);
+
+  const setSessionId = useCallback((newSessionId: string) => setAppState(prev => ({ ...prev, sessionId: newSessionId })), []);
 
 
   useEffect(() => {
@@ -120,24 +121,26 @@ const App: React.FC = () => {
             setCompetitionParticipants(prev => [...prev, ...newParticipants].sort((a,b) => a.name.localeCompare(b.name)));
         }
     }
-  }, [standings, phase]);
+  }, [standings, phase, competitionParticipants, setCompetitionParticipants]);
 
 
   const handleStartCompetition = useCallback(() => {
-    const participantsForCompetition = standings.map(p => ({
-      id: p.id,
-      name: p.name,
-      score: null,
-      seed: 0,
-    }));
-    setAppState(prev => ({
-      ...prev,
-      competitionParticipants: participantsForCompetition,
-      bracket: [],
-      thirdPlaceMatch: null,
-      phase: AppPhase.QUALIFICATION,
-    }));
-  }, [standings]);
+    setAppState(prev => {
+        const participantsForCompetition = prev.standings.map(p => ({
+          id: p.id,
+          name: p.name,
+          score: null,
+          seed: 0,
+        }));
+        return {
+          ...prev,
+          competitionParticipants: participantsForCompetition,
+          bracket: [],
+          thirdPlaceMatch: null,
+          phase: AppPhase.QUALIFICATION,
+        }
+    });
+  }, []);
 
   const handleStartBracket = useCallback((allParticipants: Participant[]) => {
     const qualifiedParticipants = allParticipants
@@ -220,12 +223,10 @@ const App: React.FC = () => {
         }
 
         let matchToUpdate: Match | null = null;
-        let roundIndexOfMatch = -1;
         for (let i = 0; i < newBracket.length; i++) {
             const foundMatch = newBracket[i].find(m => m.id === matchId);
             if (foundMatch) {
                 matchToUpdate = foundMatch;
-                roundIndexOfMatch = i;
                 break;
             }
         }
@@ -251,12 +252,12 @@ const App: React.FC = () => {
                 }
             }
             const numRounds = newBracket.length;
-            if (numRounds > 1 && roundIndexOfMatch === numRounds - 2) {
+            if (numRounds > 1) {
                 const semiFinals = newBracket[numRounds - 2];
                 if (semiFinals[0]?.winner && semiFinals[1]?.winner) {
                     const loser1 = semiFinals[0].participant1?.id === semiFinals[0].winner.id ? semiFinals[0].participant2 : semiFinals[0].participant1;
                     const loser2 = semiFinals[1].participant1?.id === semiFinals[1].winner.id ? semiFinals[1].participant2 : semiFinals[1].participant1;
-                    if (loser1 && loser2) {
+                    if (loser1 && loser2 && !newThirdPlaceMatch) {
                         const p1 = loser1.seed < loser2.seed ? loser1 : loser2;
                         const p2 = loser1.seed < loser2.seed ? loser2 : loser1;
                         newThirdPlaceMatch = { id: 999, roundIndex: -1, matchIndex: 0, participant1: p1, participant2: p2, winner: null, nextMatchId: null };
@@ -268,7 +269,7 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const calculateAndApplyPoints = useCallback(() => {
+  const handleReturnToChampionship = useCallback(() => {
     setAppState(prev => {
         const { standings, competitionParticipants, bracket, thirdPlaceMatch } = prev;
         const pointsToAdd = new Map<number, number>();
@@ -311,25 +312,26 @@ const App: React.FC = () => {
             pointsPerCompetition: [...standing.pointsPerCompetition, pointsToAdd.get(standing.id) || 0],
         }));
         newStandings.sort((a, b) => b.pointsPerCompetition.reduce((s, p) => s + p, 0) - a.pointsPerCompetition.reduce((s, p) => s + p, 0));
-        return { ...prev, standings: newStandings };
+        
+        return {
+          ...prev, 
+          standings: newStandings, 
+          competitionsHeld: prev.competitionsHeld + 1, 
+          phase: AppPhase.CHAMPIONSHIP_VIEW
+        };
     });
   }, []);
 
-  const handleReturnToChampionship = useCallback(() => {
-    calculateAndApplyPoints();
-    setAppState(prev => ({...prev, competitionsHeld: prev.competitionsHeld + 1, phase: AppPhase.CHAMPIONSHIP_VIEW}));
-  }, [calculateAndApplyPoints]);
-
   const handleResetChampionship = useCallback(() => {
-    setAppState(prev => ({
+    setAppState(() => ({
         ...getInitialState(),
-        totalCompetitions: null, // Reset total competitions to ask again
+        totalCompetitions: null,
     }));
   }, []);
   
-   const handleSetTotalCompetitions = (count: number) => {
+   const handleSetTotalCompetitions = useCallback((count: number) => {
     setAppState(prev => ({...prev, totalCompetitions: count}));
-  }
+  }, []);
 
   if (registrationInfo) {
     return <RegistrationPage initialState={registrationInfo.initialState} sessionId={registrationInfo.sessionId} />;
