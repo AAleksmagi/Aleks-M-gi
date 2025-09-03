@@ -39,33 +39,46 @@ const decodeState = (encoded: string): AppState | null => {
 const QualificationView: React.FC<QualificationViewProps> = ({ participants, setParticipants, onStartBracket, championshipStandings, setChampionshipStandings, competitionsHeld }) => {
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [registrationUrl, setRegistrationUrl] = useState('');
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleStorageUpdate = (event: StorageEvent) => {
-      if (event.key === 'dmec-championship-update' && event.newValue) {
-        const decoded = decodeState(event.newValue);
-        if (decoded) {
-            setChampionshipStandings(currentStandings => {
-                if (JSON.stringify(decoded.standings) !== JSON.stringify(currentStandings)) {
-                    return decoded.standings;
+    if (!currentSessionId) return;
+
+    // Connect to the real-time channel using Server-Sent Events
+    const eventSource = new EventSource(`https://n-8.io/dmec-${currentSessionId}`);
+
+    const handleMessage = (event: MessageEvent) => {
+        try {
+            const encodedState = event.data;
+            if (encodedState) {
+                const decoded = decodeState(encodedState);
+                if (decoded) {
+                    setChampionshipStandings(decoded.standings);
                 }
-                return currentStandings;
-            });
+            }
+        } catch (error) {
+            console.error("Failed to process message from server:", error);
         }
-      }
     };
-  
-    window.addEventListener('storage', handleStorageUpdate);
+
+    eventSource.addEventListener('message', handleMessage);
+
+    // Clean up the connection when the component unmounts or the session ID changes
     return () => {
-      window.removeEventListener('storage', handleStorageUpdate);
+        eventSource.removeEventListener('message', handleMessage);
+        eventSource.close();
     };
-  }, [setChampionshipStandings]);
+}, [currentSessionId, setChampionshipStandings]);
 
 
   const openRegistrationModal = () => {
+    // Generate a unique session ID for this registration link
+    const sessionId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+    setCurrentSessionId(sessionId);
+    
     const state: AppState = { standings: championshipStandings, competitionsHeld };
     const encodedState = encodeState(state);
-    const url = `${window.location.origin}${window.location.pathname}#registration/${encodedState}`;
+    const url = `${window.location.origin}${window.location.pathname}#registration/${sessionId}/${encodedState}`;
     setRegistrationUrl(url);
     setIsRegistrationModalOpen(true);
   };

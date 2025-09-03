@@ -11,6 +11,11 @@ interface AppState {
   competitionsHeld: number;
 }
 
+interface RegistrationInfo {
+  initialState: AppState;
+  sessionId: string;
+}
+
 const decodeState = (encoded: string): AppState | null => {
   try {
     const json = atob(encoded);
@@ -21,10 +26,17 @@ const decodeState = (encoded: string): AppState | null => {
   }
 };
 
-const getRegistrationStateFromURL = (): AppState | null => {
+const getRegistrationInfoFromURL = (): RegistrationInfo | null => {
   if (window.location.hash.startsWith('#registration/')) {
-    const encodedState = window.location.hash.substring(14);
-    return decodeState(encodedState);
+    const parts = window.location.hash.substring(14).split('/');
+    if (parts.length >= 2) {
+      const sessionId = parts[0];
+      const encodedState = parts.slice(1).join('/');
+      const initialState = decodeState(encodedState);
+      if (initialState && sessionId) {
+        return { initialState, sessionId };
+      }
+    }
   }
   return null;
 };
@@ -40,7 +52,7 @@ const App: React.FC = () => {
   const [totalCompetitions, setTotalCompetitions] = useState<number | null>(null);
   const [competitionsHeld, setCompetitionsHeld] = useState<number>(0);
 
-  const [initialRegistrationState] = useState(getRegistrationStateFromURL());
+  const [registrationInfo] = useState(getRegistrationInfoFromURL());
 
   useEffect(() => {
     if (phase === AppPhase.QUALIFICATION) {
@@ -355,8 +367,8 @@ const App: React.FC = () => {
     setPhase(AppPhase.CHAMPIONSHIP_VIEW);
   }, []);
 
-  if (initialRegistrationState) {
-    return <RegistrationPage initialState={initialRegistrationState} />;
+  if (registrationInfo) {
+    return <RegistrationPage initialState={registrationInfo.initialState} sessionId={registrationInfo.sessionId} />;
   }
 
   return (

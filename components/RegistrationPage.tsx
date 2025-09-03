@@ -8,6 +8,7 @@ interface AppState {
 
 interface RegistrationPageProps {
   initialState: AppState;
+  sessionId: string;
 }
 
 const encodeState = (state: AppState): string => {
@@ -20,12 +21,12 @@ const encodeState = (state: AppState): string => {
   }
 };
 
-const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState }) => {
+const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState, sessionId }) => {
   const [name, setName] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('Nimi on kohustuslik.');
@@ -54,8 +55,18 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState }) => 
     };
 
     const encodedState = encodeState(newState);
-    // Use localStorage to broadcast the update to the host's tab.
-    localStorage.setItem('dmec-championship-update', encodedState);
+    
+    try {
+        await fetch(`https://n-8.io/dmec-${sessionId}`, {
+            method: 'POST',
+            body: encodedState,
+            headers: { 'Content-Type': 'text/plain' }
+        });
+    } catch (fetchError) {
+        console.error("Failed to send registration update:", fetchError);
+        setError("Registreerimine ebaõnnestus võrguvea tõttu. Proovi uuesti.");
+        return;
+    }
     
     setIsRegistered(true);
     setError('');
