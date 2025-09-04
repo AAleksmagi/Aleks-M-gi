@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppPhase } from './constants';
 import type { Participant, BracketData, Match, ChampionshipStanding, AppState } from './types';
 import QualificationView from './components/QualificationView';
@@ -23,6 +23,7 @@ const getInitialState = (): AppState => {
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(getInitialState);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const broadcastTimeoutRef = useRef<number | null>(null);
 
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const sessionParam = useMemo(() => urlParams.get('session'), [urlParams]);
@@ -73,25 +74,37 @@ const App: React.FC = () => {
   
   useEffect(() => {
     if (sessionId) {
-      const broadcastState = async () => {
-        try {
-          const response = await fetch(`https://ntfy.sh/${sessionId}`, {
-            method: 'POST',
-            body: JSON.stringify(appState),
-            headers: {
-              'Title': 'AppStateUpdate',
-              'Tags': 'arrows_clockwise'
+      if (broadcastTimeoutRef.current) {
+        clearTimeout(broadcastTimeoutRef.current);
+      }
+
+      broadcastTimeoutRef.current = window.setTimeout(() => {
+        const broadcastState = async () => {
+          try {
+            const response = await fetch(`https://ntfy.sh/${sessionId}`, {
+              method: 'POST',
+              body: JSON.stringify(appState),
+              headers: {
+                'Title': 'AppStateUpdate',
+                'Tags': 'arrows_clockwise'
+              }
+            });
+            if (!response.ok) {
+              console.error("Failed to broadcast state:", response.status, await response.text());
             }
-          });
-          if (!response.ok) {
-            console.error("Failed to broadcast state:", response.status, await response.text());
+          } catch (e) {
+            console.error("Failed to broadcast state:", e);
           }
-        } catch (e) {
-          console.error("Failed to broadcast state:", e);
-        }
-      };
-      broadcastState();
+        };
+        broadcastState();
+      }, 500); // Debounce sending state by 500ms
     }
+
+    return () => {
+        if (broadcastTimeoutRef.current) {
+            clearTimeout(broadcastTimeoutRef.current);
+        }
+    };
   }, [appState, sessionId]);
 
 
