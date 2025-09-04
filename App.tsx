@@ -72,40 +72,46 @@ const App: React.FC = () => {
     }
   }, [sessionId, sessionParam, liveParam]);
   
-  useEffect(() => {
-    if (sessionId) {
+  const broadcastState = useCallback((stateToBroadcast: AppState) => {
+      if (!sessionId) return;
+      
+      // Clear any existing timer to reset the debounce period
       if (broadcastTimeoutRef.current) {
         clearTimeout(broadcastTimeoutRef.current);
       }
-
-      broadcastTimeoutRef.current = window.setTimeout(() => {
-        const broadcastState = async () => {
-          try {
-            const response = await fetch(`https://ntfy.sh/${sessionId}`, {
-              method: 'POST',
-              body: JSON.stringify(appState),
-              headers: {
-                'Title': 'AppStateUpdate',
-                'Tags': 'arrows_clockwise'
-              }
-            });
-            if (!response.ok) {
-              console.error("Failed to broadcast state:", response.status, await response.text());
+      
+      // Set a new timer to broadcast the state after a delay
+      broadcastTimeoutRef.current = window.setTimeout(async () => {
+        try {
+          const response = await fetch(`https://ntfy.sh/${sessionId}`, {
+            method: 'POST',
+            body: JSON.stringify(stateToBroadcast),
+            headers: {
+              'Title': 'AppStateUpdate',
+              'Tags': 'arrows_clockwise'
             }
-          } catch (e) {
-            console.error("Failed to broadcast state:", e);
+          });
+          if (!response.ok) {
+            console.error("Failed to broadcast state:", response.status, await response.text());
           }
-        };
-        broadcastState();
-      }, 500); // Debounce sending state by 500ms
-    }
-
-    return () => {
-        if (broadcastTimeoutRef.current) {
-            clearTimeout(broadcastTimeoutRef.current);
+        } catch (e) {
+          console.error("Failed to broadcast state:", e);
         }
-    };
-  }, [appState, sessionId]);
+      }, 750); // Use a 750ms delay to prevent rate-limiting
+  }, [sessionId]);
+
+  useEffect(() => {
+      if (sessionId) {
+          broadcastState(appState);
+      }
+      
+      // Cleanup function to clear the timeout if the component unmounts
+      return () => {
+          if (broadcastTimeoutRef.current) {
+              clearTimeout(broadcastTimeoutRef.current);
+          }
+      };
+  }, [appState, sessionId, broadcastState]);
 
 
   const { phase, standings, competitionParticipants, bracket, thirdPlaceMatch, totalCompetitions, competitionsHeld } = appState;
