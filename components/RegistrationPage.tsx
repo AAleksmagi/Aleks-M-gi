@@ -12,7 +12,10 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
   useEffect(() => {
     if (isRegistered) {
       const timer = setTimeout(() => {
-        window.location.href = `${window.location.pathname}?live=${sessionId}`;
+        const nextURL = new URL(window.location.href);
+        nextURL.searchParams.delete('session');
+        nextURL.searchParams.set('live', sessionId);
+        window.location.href = nextURL.toString();
       }, 3000);
       return () => clearTimeout(timer);
     }
@@ -52,8 +55,6 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
     
     setIsRegistered(true);
     setError('');
-
-    window.history.replaceState(null, '', window.location.pathname);
   };
 
   return (
