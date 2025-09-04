@@ -98,7 +98,9 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
 
     useEffect(() => {
-        const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse`);
+        // By using `since=all`, ntfy.sh will replay the last cached message for the topic
+        // upon connection. This ensures the live view gets the most recent state immediately.
+        const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse?since=all`);
 
         eventSource.onopen = () => {
             setConnectionStatus('connecting');
