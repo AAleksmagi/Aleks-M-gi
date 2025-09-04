@@ -103,7 +103,7 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
         const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse?since=all`);
 
         eventSource.onopen = () => {
-            setConnectionStatus('connecting');
+            setConnectionStatus('live');
         };
         
         eventSource.onmessage = (event) => {

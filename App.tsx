@@ -75,7 +75,7 @@ const App: React.FC = () => {
     if (sessionId) {
       const broadcastState = async () => {
         try {
-          await fetch(`https://ntfy.sh/${sessionId}`, {
+          const response = await fetch(`https://ntfy.sh/${sessionId}`, {
             method: 'POST',
             body: JSON.stringify(appState),
             headers: {
@@ -83,6 +83,9 @@ const App: React.FC = () => {
               'Tags': 'arrows_clockwise'
             }
           });
+          if (!response.ok) {
+            console.error("Failed to broadcast state:", response.status, await response.text());
+          }
         } catch (e) {
           console.error("Failed to broadcast state:", e);
         }

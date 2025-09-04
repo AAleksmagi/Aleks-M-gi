@@ -28,6 +28,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
       setError('Nimi on kohustuslik.');
       return;
     }
+    setError('');
 
     const trimmedName = name.trim();
 
@@ -40,7 +41,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
     const newParticipantJson = JSON.stringify(newParticipant);
     
     try {
-        await fetch(`https://ntfy.sh/${sessionId}`, {
+        const response = await fetch(`https://ntfy.sh/${sessionId}`, {
             method: 'POST',
             body: newParticipantJson,
             headers: {
@@ -48,6 +49,13 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
                 'Tags': 'person_add'
             }
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Registration POST failed:', response.status, errorText);
+          setError(`Registreerimine ebaõnnestus serveri vea tõttu (${response.status}). Proovi uuesti.`);
+          return;
+        }
     } catch (fetchError) {
         console.error("Failed to send registration update:", fetchError);
         setError("Registreerimine ebaõnnestus võrguvea tõttu. Proovi uuesti.");
@@ -55,7 +63,6 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
     }
     
     setIsRegistered(true);
-    setError('');
   };
 
   return (
