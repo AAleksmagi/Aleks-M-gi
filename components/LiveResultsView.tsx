@@ -118,10 +118,9 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
         };
 
         eventSource.onerror = (err) => {
-            console.error("EventSource failed. The browser will attempt to reconnect automatically.", err);
+            console.error("EventSource failed:", err);
             setConnectionStatus('error');
-            // Do not close the connection here. EventSource will handle reconnection.
-            // When it reconnects, the 'onopen' event will be fired.
+            eventSource.close();
         };
 
         return () => {

@@ -9,7 +9,6 @@ interface ChampionshipViewProps {
   setTotalCompetitions: (count: number) => void;
   competitionsHeld: number;
   onResetChampionship: () => void;
-  onRestartWithSameParticipants: () => void;
   sessionId: string | null;
   onEnableLiveView: () => void;
 }
@@ -77,7 +76,6 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
     setTotalCompetitions, 
     competitionsHeld, 
     onResetChampionship,
-    onRestartWithSameParticipants,
     sessionId,
     onEnableLiveView
 }) => {
@@ -327,21 +325,13 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
 
             <div className="mt-8 text-center">
                 {isSeasonFinished ? (
-                    <div className="flex flex-col sm:flex-row justify-center items-center gap-4 opacity-0 animate-podium-item" style={{ animationDelay: '1.0s' }}>
-                        <button
-                            onClick={onRestartWithSameParticipants}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition duration-300 shadow-lg"
-                        >
-                            Uus hooaeg samade osalejatega
-                        </button>
-                         <button
-                            onClick={onResetChampionship}
-                            className="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-6 rounded-lg text-md transition duration-300"
-                            title="Kustutab kõik osalejad ja alustab uut meistrivõistlust."
-                        >
-                            Alusta tühjalt lehelt
-                        </button>
-                    </div>
+                    <button
+                        onClick={onResetChampionship}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition duration-300 shadow-lg opacity-0 animate-podium-item"
+                        style={{ animationDelay: '1.0s' }}
+                    >
+                        Alusta uut hooaega
+                    </button>
                 ) : (
                     <>
                         <button
