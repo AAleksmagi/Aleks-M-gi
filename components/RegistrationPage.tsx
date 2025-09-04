@@ -12,10 +12,11 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
   useEffect(() => {
     if (isRegistered) {
       const timer = setTimeout(() => {
-        const nextURL = new URL(window.location.href);
-        nextURL.searchParams.delete('session');
-        nextURL.searchParams.set('live', sessionId);
-        window.location.href = nextURL.toString();
+        // Construct a clean URL for the live view to ensure reliability.
+        // Use window.location.replace to prevent adding the registration page to browser history,
+        // which creates a better user experience.
+        const liveUrl = `${window.location.origin}${window.location.pathname}?live=${sessionId}`;
+        window.location.replace(liveUrl);
       }, 3000);
       return () => clearTimeout(timer);
     }
