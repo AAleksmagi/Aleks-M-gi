@@ -40,27 +40,14 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
 
     const newParticipantJson = JSON.stringify(newParticipant);
     
-    try {
-        const response = await fetch(`https://ntfy.sh/${sessionId}`, {
-            method: 'POST',
-            body: newParticipantJson,
-            headers: {
-                'Title': 'Uus registreerimine: ' + trimmedName,
-                'Tags': 'person_add'
-            }
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Registration POST failed:', response.status, errorText);
-          setError(`Registreerimine ebaõnnestus serveri vea tõttu (${response.status}). Proovi uuesti.`);
-          return;
+    await fetch(`https://ntfy.sh/${sessionId}`, {
+        method: 'POST',
+        body: newParticipantJson,
+        headers: {
+            'Title': 'Uus registreerimine: ' + trimmedName,
+            'Tags': 'person_add'
         }
-    } catch (fetchError) {
-        console.error("Failed to send registration update:", fetchError);
-        setError("Registreerimine ebaõnnestus võrguvea tõttu. Proovi uuesti.");
-        return;
-    }
+    });
     
     setIsRegistered(true);
   };
