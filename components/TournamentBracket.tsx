@@ -7,24 +7,26 @@ import { AppPhase } from '../constants';
 interface MatchCardProps {
   match: Match;
   onSetWinner: (matchId: number, winner: Participant) => void;
+  isReadOnly?: boolean;
 }
 
-const MatchCard: React.FC<MatchCardProps> = ({ match, onSetWinner }) => {
+const MatchCard: React.FC<MatchCardProps> = ({ match, onSetWinner, isReadOnly = false }) => {
   const { participant1, participant2, winner } = match;
 
   const canSelectWinner = participant1 && participant2 && !winner;
 
   const handleSelectWinner = (selectedParticipant: Participant) => {
-    if (canSelectWinner) {
+    if (canSelectWinner && !isReadOnly) {
       onSetWinner(match.id, selectedParticipant);
     }
   };
 
   const getParticipantClass = (participant: Participant | null, isWinner: boolean) => {
     if (!participant) return 'text-gray-500 italic';
-    if (!winner && canSelectWinner) return 'cursor-pointer hover:bg-blue-600';
+    if (!winner && canSelectWinner && !isReadOnly) return 'cursor-pointer hover:bg-blue-600';
     if (isWinner) return 'font-bold text-green-300';
-    return 'text-gray-500 line-through';
+    if (winner && !isWinner) return 'text-gray-500 line-through';
+    return '';
   };
   
   const isP1Winner = winner !== null && winner?.id === participant1?.id;
@@ -151,6 +153,7 @@ interface TournamentBracketProps {
   phase: AppPhase;
   onReturnToChampionship: () => void;
   participants: Participant[];
+  isReadOnly?: boolean;
 }
 
 const getRoundName = (numMatches: number) => {
@@ -169,6 +172,7 @@ const TournamentBracket: React.FC<TournamentBracketProps> = ({
     phase, 
     onReturnToChampionship, 
     participants,
+    isReadOnly = false,
 }) => {
     if (!bracketData || bracketData.length === 0) {
         return <p>Laen tabelit...</p>;
@@ -214,7 +218,7 @@ const TournamentBracket: React.FC<TournamentBracketProps> = ({
                                     </div>
                                     {round.map((match) => (
                                         <div key={match.id} style={{ height: `${matchSlotHeight}rem` }} className="flex items-center">
-                                            <MatchCard match={match} onSetWinner={onSetWinner} />
+                                            <MatchCard match={match} onSetWinner={onSetWinner} isReadOnly={isReadOnly} />
                                         </div>
                                     ))}
                                 </div>
@@ -238,13 +242,13 @@ const TournamentBracket: React.FC<TournamentBracketProps> = ({
                             <h3 className="text-center font-bold text-yellow-400">Finaalid</h3>
                         </div>
                         {finalRound && finalRound.map((match) => (
-                            <MatchCard key={match.id} match={match} onSetWinner={onSetWinner} />
+                            <MatchCard key={match.id} match={match} onSetWinner={onSetWinner} isReadOnly={isReadOnly} />
                         ))}
                         
                         {thirdPlaceMatch && (
                             <div className="mt-8">
                                 <div className="text-center font-bold mb-4 text-orange-400">3. koha mäng</div>
-                                <MatchCard match={thirdPlaceMatch} onSetWinner={onSetWinner} />
+                                <MatchCard match={thirdPlaceMatch} onSetWinner={onSetWinner} isReadOnly={isReadOnly} />
                             </div>
                         )}
                     </div>

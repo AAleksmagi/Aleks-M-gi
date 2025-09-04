@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface RegistrationPageProps {
   sessionId: string;
@@ -8,6 +8,15 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
   const [name, setName] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isRegistered) {
+      const timer = setTimeout(() => {
+        window.location.href = `${window.location.pathname}?live=${sessionId}`;
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isRegistered, sessionId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +65,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h1 className="text-3xl font-bold text-white mt-4">Edukalt registreeritud!</h1>
-            <p className="text-gray-400 mt-2">Sinu nimi on lisatud võistluse nimekirja. Edu!</p>
+            <p className="text-gray-400 mt-2">Sinu nimi on lisatud võistluse nimekirja. Sind suunatakse tulemuste lehele 3 sekundi pärast...</p>
           </div>
         ) : (
           <>

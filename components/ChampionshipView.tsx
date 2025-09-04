@@ -9,8 +9,8 @@ interface ChampionshipViewProps {
   setTotalCompetitions: (count: number) => void;
   competitionsHeld: number;
   onResetChampionship: () => void;
-  registrationSessionId: string | null;
-  onEnableRegistration: () => void;
+  sessionId: string | null;
+  onEnableLiveView: () => void;
 }
 
 const PointsTable: React.FC<{ title: string; data: Record<string, string | number> }> = ({ title, data }) => (
@@ -35,6 +35,38 @@ const PointsTable: React.FC<{ title: string; data: Record<string, string | numbe
     </div>
 );
 
+const LinkSharer: React.FC<{ label: string, description: string, link: string }> = ({ label, description, link }) => {
+    const [copied, setCopied] = useState(false);
+    const copyLink = () => {
+        navigator.clipboard.writeText(link).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    return (
+        <div>
+            <h4 className="font-semibold text-blue-300 mb-1">{label}</h4>
+            <p className="text-sm text-gray-400 mb-2">{description}</p>
+            <div className="flex gap-2 items-center bg-gray-900 p-2 rounded-md">
+                <input
+                    type="text"
+                    readOnly
+                    value={link}
+                    className="flex-grow bg-transparent text-gray-300 focus:outline-none"
+                    aria-label={label}
+                />
+                <button
+                    onClick={copyLink}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-md text-sm transition duration-300"
+                >
+                    {copied ? 'Kopeeritud!' : 'Kopeeri'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 
 const ChampionshipView: React.FC<ChampionshipViewProps> = ({ 
     standings, 
@@ -44,23 +76,18 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
     setTotalCompetitions, 
     competitionsHeld, 
     onResetChampionship,
-    registrationSessionId,
-    onEnableRegistration
+    sessionId,
+    onEnableLiveView
 }) => {
     const [newName, setNewName] = useState('');
     const [seasonLengthInput, setSeasonLengthInput] = useState(totalCompetitions?.toString() || '');
-    const [linkCopied, setLinkCopied] = useState(false);
-
-    const registrationLink = registrationSessionId 
-        ? `${window.location.origin}${window.location.pathname}?session=${registrationSessionId}`
+    
+    const registrationLink = sessionId 
+        ? `${window.location.origin}${window.location.pathname}?session=${sessionId}`
         : '';
-        
-    const copyLink = () => {
-        navigator.clipboard.writeText(registrationLink).then(() => {
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2000);
-        });
-    };
+    const liveViewLink = sessionId
+        ? `${window.location.origin}${window.location.pathname}?live=${sessionId}`
+        : '';
 
     const addParticipant = () => {
         if (newName.trim()) {
@@ -252,36 +279,30 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
                     </div>
 
                     <div className="my-6 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                        <h3 className="text-lg font-semibold text-blue-300 mb-2">Osalejate registreerimine</h3>
-                        {!registrationSessionId ? (
+                        <h3 className="text-lg font-semibold mb-3">Reaalajas jagamine</h3>
+                        {!sessionId ? (
                             <>
-                                <p className="text-sm text-gray-400 mb-3">Loo unikaalne link, mida jagada osalejatega, et nad saaksid ise end võistlustele registreerida.</p>
+                                <p className="text-sm text-gray-400 mb-3">Loo unikaalsed lingid, et lubada osalejatel registreeruda ja pealtvaatajatel võistlust jälgida.</p>
                                 <button
-                                    onClick={onEnableRegistration}
+                                    onClick={onEnableLiveView}
                                     className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
                                 >
-                                    Luba registreerimine
+                                    Luba registreerimine ja reaalajas vaade
                                 </button>
                             </>
                         ) : (
-                            <>
-                                <p className="text-sm text-gray-400 mb-3">Jaga seda linki osalejatega. Uued registreerujad ilmuvad automaatselt tabelisse.</p>
-                                <div className="flex gap-2 items-center bg-gray-900 p-2 rounded-md">
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        value={registrationLink}
-                                        className="flex-grow bg-transparent text-gray-300 focus:outline-none"
-                                        aria-label="Registration Link"
-                                    />
-                                    <button
-                                        onClick={copyLink}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-md text-sm transition duration-300"
-                                    >
-                                        {linkCopied ? 'Kopeeritud!' : 'Kopeeri'}
-                                    </button>
-                                </div>
-                            </>
+                            <div className="space-y-4">
+                               <LinkSharer 
+                                    label="Registreerimise link"
+                                    description="Jaga seda linki osalejatega. Uued registreerujad ilmuvad automaatselt tabelisse."
+                                    link={registrationLink}
+                               />
+                               <LinkSharer
+                                    label="Reaalajas tulemuste link"
+                                    description="Jaga seda linki pealtvaatajatega, et nad saaksid võistlust reaalajas jälgida."
+                                    link={liveViewLink}
+                               />
+                            </div>
                         )}
                     </div>
 

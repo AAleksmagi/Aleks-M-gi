@@ -24,3 +24,20 @@ export interface ChampionshipStanding {
     name: string;
     pointsPerCompetition: number[];
 }
+
+export enum AppPhase {
+  CHAMPIONSHIP_VIEW = 'CHAMPIONSHIP_VIEW',
+  QUALIFICATION = 'QUALIFICATION',
+  BRACKET = 'BRACKET',
+  FINISHED = 'FINISHED',
+}
+
+export interface AppState {
+  phase: AppPhase;
+  standings: ChampionshipStanding[];
+  competitionParticipants: Participant[];
+  bracket: BracketData;
+  thirdPlaceMatch: Match | null;
+  totalCompetitions: number | null;
+  competitionsHeld: number;
+}

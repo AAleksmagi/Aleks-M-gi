@@ -1,20 +1,11 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { AppPhase } from './constants';
-import type { Participant, BracketData, Match, ChampionshipStanding } from './types';
+import type { Participant, BracketData, Match, ChampionshipStanding, AppState } from './types';
 import QualificationView from './components/QualificationView';
 import TournamentBracket from './components/TournamentBracket';
 import ChampionshipView from './components/ChampionshipView';
 import RegistrationPage from './components/RegistrationPage';
-
-interface AppState {
-  phase: AppPhase;
-  standings: ChampionshipStanding[];
-  competitionParticipants: Participant[];
-  bracket: BracketData;
-  thirdPlaceMatch: Match | null;
-  totalCompetitions: number | null;
-  competitionsHeld: number;
-}
+import LiveResultsView from './components/LiveResultsView';
 
 const getInitialState = (): AppState => {
   return {
@@ -31,35 +22,38 @@ const getInitialState = (): AppState => {
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(getInitialState);
-  const [registrationSessionId, setRegistrationSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const sessionParam = useMemo(() => urlParams.get('session'), [urlParams]);
+  const liveParam = useMemo(() => urlParams.get('live'), [urlParams]);
 
   useEffect(() => {
-    if (!sessionParam && registrationSessionId) {
-        const eventSource = new EventSource(`https://ntfy.sh/${registrationSessionId}/sse`);
+    if (!sessionParam && !liveParam && sessionId) {
+        const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse`);
 
         eventSource.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                const newParticipantData = JSON.parse(message.message);
+                if (message.title.startsWith('Uus registreerimine')) {
+                    const newParticipantData = JSON.parse(message.message);
 
-                if (newParticipantData && newParticipantData.id && newParticipantData.name) {
-                    setAppState(prev => {
-                        const isDuplicate = prev.standings.some(p => p.name.toLowerCase() === newParticipantData.name.toLowerCase());
-                        if (isDuplicate) {
-                            console.warn(`Duplicate registration rejected: ${newParticipantData.name}`);
-                            return prev;
-                        }
+                    if (newParticipantData && newParticipantData.id && newParticipantData.name) {
+                        setAppState(prev => {
+                            const isDuplicate = prev.standings.some(p => p.name.toLowerCase() === newParticipantData.name.toLowerCase());
+                            if (isDuplicate) {
+                                console.warn(`Duplicate registration rejected: ${newParticipantData.name}`);
+                                return prev;
+                            }
 
-                        const newParticipant: ChampionshipStanding = {
-                            ...newParticipantData,
-                            pointsPerCompetition: Array(prev.competitionsHeld).fill(0),
-                        };
+                            const newParticipant: ChampionshipStanding = {
+                                ...newParticipantData,
+                                pointsPerCompetition: Array(prev.competitionsHeld).fill(0),
+                            };
 
-                        return { ...prev, standings: [...prev.standings, newParticipant] };
-                    });
+                            return { ...prev, standings: [...prev.standings, newParticipant] };
+                        });
+                    }
                 }
             } catch (e) {
                 console.error("Failed to process registration message:", e);
@@ -75,7 +69,27 @@ const App: React.FC = () => {
             eventSource.close();
         };
     }
-  }, [registrationSessionId, sessionParam]);
+  }, [sessionId, sessionParam, liveParam]);
+  
+  useEffect(() => {
+    if (sessionId) {
+      const broadcastState = async () => {
+        try {
+          await fetch(`https://ntfy.sh/${sessionId}`, {
+            method: 'POST',
+            body: JSON.stringify(appState),
+            headers: {
+              'Title': 'AppStateUpdate',
+              'Tags': 'arrows_clockwise'
+            }
+          });
+        } catch (e) {
+          console.error("Failed to broadcast state:", e);
+        }
+      };
+      broadcastState();
+    }
+  }, [appState, sessionId]);
 
 
   const { phase, standings, competitionParticipants, bracket, thirdPlaceMatch, totalCompetitions, competitionsHeld } = appState;
@@ -186,78 +200,73 @@ const App: React.FC = () => {
 
         if (newThirdPlaceMatch && matchId === newThirdPlaceMatch.id) {
             newThirdPlaceMatch = { ...newThirdPlaceMatch, winner };
-            const finalMatch = newBracket[newBracket.length - 1]?.[0];
-            if (finalMatch?.winner) {
-                newPhase = AppPhase.FINISHED;
-            }
-            return {...prev, thirdPlaceMatch: newThirdPlaceMatch, phase: newPhase };
-        }
-
-        let matchToUpdate: Match | null = null;
-        for (let i = 0; i < newBracket.length; i++) {
-            const foundMatch = newBracket[i].find(m => m.id === matchId);
-            if (foundMatch) {
-                matchToUpdate = foundMatch;
-                break;
-            }
-        }
-
-        if (matchToUpdate && !matchToUpdate.winner) {
-            matchToUpdate.winner = winner;
-            if (matchToUpdate.nextMatchId !== null) {
-                let nextMatch: Match | null = null;
-                for (const round of newBracket) {
-                    nextMatch = round.find(m => m.id === matchToUpdate.nextMatchId) || null;
-                    if (nextMatch) break;
+        } else {
+            let matchToUpdate: Match | null = null;
+            for (let i = 0; i < newBracket.length; i++) {
+                const foundMatch = newBracket[i].find(m => m.id === matchId);
+                if (foundMatch) {
+                    matchToUpdate = foundMatch;
+                    break;
                 }
-                if (nextMatch) {
-                    if (matchToUpdate.matchIndex % 2 === 0) nextMatch.participant1 = winner;
-                    else nextMatch.participant2 = winner;
-                    if (nextMatch.participant1 && nextMatch.participant2 && nextMatch.participant1.seed > nextMatch.participant2.seed) {
-                        [nextMatch.participant1, nextMatch.participant2] = [nextMatch.participant2, nextMatch.participant1];
+            }
+
+            if (matchToUpdate && !matchToUpdate.winner) {
+                matchToUpdate.winner = winner;
+                if (matchToUpdate.nextMatchId !== null) {
+                    let nextMatch: Match | null = null;
+                    for (const round of newBracket) {
+                        nextMatch = round.find(m => m.id === matchToUpdate.nextMatchId) || null;
+                        if (nextMatch) break;
                     }
-                }
-            }
-
-            const numRounds = newBracket.length;
-            if (numRounds > 1 && !newThirdPlaceMatch) {
-                const semiFinals = newBracket[numRounds - 2];
-                if (semiFinals.every(m => m.winner)) {
-                    const findLoser = (match: Match): Participant | null => {
-                        if (!match.participant1 || !match.participant2) {
-                            return null;
+                    if (nextMatch) {
+                        if (matchToUpdate.matchIndex % 2 === 0) nextMatch.participant1 = winner;
+                        else nextMatch.participant2 = winner;
+                        if (nextMatch.participant1 && nextMatch.participant2 && nextMatch.participant1.seed > nextMatch.participant2.seed) {
+                            [nextMatch.participant1, nextMatch.participant2] = [nextMatch.participant2, nextMatch.participant1];
                         }
-                        return match.winner?.id === match.participant1.id ? match.participant2 : match.participant1;
-                    };
-
-                    const losers = semiFinals.map(findLoser).filter((p): p is Participant => p !== null);
-                    
-                    if (losers.length === 2) {
-                        const [p1, p2] = losers[0].seed < losers[1].seed ? [losers[0], losers[1]] : [losers[1], losers[0]];
-                        newThirdPlaceMatch = { id: 999, roundIndex: -1, matchIndex: 0, participant1: p1, participant2: p2, winner: null, nextMatchId: null };
-                    } else if (losers.length === 1) {
-                        const singleLoser = losers[0];
-                        newThirdPlaceMatch = { 
-                            id: 999, 
-                            roundIndex: -1, 
-                            matchIndex: 0, 
-                            participant1: singleLoser, 
-                            participant2: null, 
-                            winner: singleLoser, 
-                            nextMatchId: null 
-                        };
                     }
                 }
             }
-            
-            const isFinalMatch = matchToUpdate.roundIndex === newBracket.length - 1;
-            if (isFinalMatch) {
-                const thirdPlaceApplicable = newBracket.length > 1 && newBracket[0].length > 1;
-                if (!thirdPlaceApplicable || (newThirdPlaceMatch && newThirdPlaceMatch.winner)) {
-                    newPhase = AppPhase.FINISHED;
+        }
+        
+        const numRounds = newBracket.length;
+        if (numRounds > 1 && !newThirdPlaceMatch) {
+            const semiFinals = newBracket[numRounds - 2];
+            if (semiFinals.every(m => m.winner)) {
+                const findLoser = (match: Match): Participant | null => {
+                    if (!match.participant1 || !match.participant2) {
+                        return null;
+                    }
+                    return match.winner?.id === match.participant1.id ? match.participant2 : match.participant1;
+                };
+
+                const losers = semiFinals.map(findLoser).filter((p): p is Participant => p !== null);
+                
+                if (losers.length === 2) {
+                    const [p1, p2] = losers[0].seed < losers[1].seed ? [losers[0], losers[1]] : [losers[1], losers[0]];
+                    newThirdPlaceMatch = { id: 999, roundIndex: -1, matchIndex: 0, participant1: p1, participant2: p2, winner: null, nextMatchId: null };
+                } else if (losers.length === 1) {
+                    const singleLoser = losers[0];
+                    newThirdPlaceMatch = { 
+                        id: 999, 
+                        roundIndex: -1, 
+                        matchIndex: 0, 
+                        participant1: singleLoser, 
+                        participant2: null, 
+                        winner: singleLoser, 
+                        nextMatchId: null 
+                    };
                 }
             }
         }
+
+        const finalMatch = newBracket[newBracket.length - 1]?.[0];
+        const isTournamentFinished = finalMatch?.winner && (!newThirdPlaceMatch || newThirdPlaceMatch.winner);
+
+        if (isTournamentFinished) {
+            newPhase = AppPhase.FINISHED;
+        }
+
         return { ...prev, bracket: newBracket, thirdPlaceMatch: newThirdPlaceMatch, phase: newPhase };
     });
   }, []);
@@ -323,13 +332,17 @@ const App: React.FC = () => {
     setAppState(prev => ({...prev, totalCompetitions: count}));
   }, []);
 
-  const handleEnableRegistration = useCallback(() => {
+  const handleEnableLiveView = useCallback(() => {
     const newSessionId = `dmec-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    setRegistrationSessionId(newSessionId);
+    setSessionId(newSessionId);
   }, []);
 
   if (sessionParam) {
     return <RegistrationPage sessionId={sessionParam} />;
+  }
+  
+  if (liveParam) {
+    return <LiveResultsView sessionId={liveParam} />;
   }
 
   return (
@@ -349,8 +362,8 @@ const App: React.FC = () => {
                 setTotalCompetitions={handleSetTotalCompetitions}
                 competitionsHeld={competitionsHeld}
                 onResetChampionship={handleResetChampionship}
-                registrationSessionId={registrationSessionId}
-                onEnableRegistration={handleEnableRegistration}
+                sessionId={sessionId}
+                onEnableLiveView={handleEnableLiveView}
             />
         )}
         {phase === AppPhase.QUALIFICATION && (
