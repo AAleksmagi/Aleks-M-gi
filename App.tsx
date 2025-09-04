@@ -3,7 +3,8 @@ import { AppPhase } from './constants';
 import type { Participant, BracketData, Match, ChampionshipStanding } from './types';
 import QualificationView from './components/QualificationView';
 import TournamentBracket from './components/TournamentBracket';
-import ChampionshipView from './components/ChampionshipView';
+// Fix: Use a named import for ChampionshipView as it is not a default export.
+import { ChampionshipView } from './components/ChampionshipView';
 import RegistrationPage from './components/RegistrationPage';
 
 interface AppState {
@@ -67,8 +68,9 @@ const App: React.FC = () => {
         };
 
         eventSource.onerror = (err) => {
-            console.error("EventSource failed:", err);
-            eventSource.close();
+            console.error("EventSource connection error. The browser will attempt to reconnect automatically.", err);
+            // By not calling eventSource.close(), we allow the browser's native
+            // reconnection logic to handle transient network issues.
         };
 
         return () => {
