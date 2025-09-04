@@ -218,20 +218,42 @@ const App: React.FC = () => {
                     }
                 }
             } else {
-                if (newThirdPlaceMatch?.winner || newBracket.length <= 1) {
-                    newPhase = AppPhase.FINISHED;
+                 const finalMatchIsThisOne = matchToUpdate.roundIndex === newBracket.length - 1;
+                 const thirdPlaceApplicable = newBracket.length > 1 && newBracket[0].length > 1;
+
+                if (finalMatchIsThisOne) {
+                    if (!thirdPlaceApplicable || (newThirdPlaceMatch && newThirdPlaceMatch.winner)) {
+                        newPhase = AppPhase.FINISHED;
+                    }
                 }
             }
             const numRounds = newBracket.length;
             if (numRounds > 1) {
                 const semiFinals = newBracket[numRounds - 2];
-                if (semiFinals[0]?.winner && semiFinals[1]?.winner) {
-                    const loser1 = semiFinals[0].participant1?.id === semiFinals[0].winner.id ? semiFinals[0].participant2 : semiFinals[0].participant1;
-                    const loser2 = semiFinals[1].participant1?.id === semiFinals[1].winner.id ? semiFinals[1].participant2 : semiFinals[1].participant1;
-                    if (loser1 && loser2 && !newThirdPlaceMatch) {
-                        const p1 = loser1.seed < loser2.seed ? loser1 : loser2;
-                        const p2 = loser1.seed < loser2.seed ? loser2 : loser1;
+                if (semiFinals.every(m => m.winner) && !newThirdPlaceMatch) {
+                    const findLoser = (match: Match): Participant | null => {
+                        if (!match.participant1 || !match.participant2) {
+                            return null;
+                        }
+                        return match.winner?.id === match.participant1.id ? match.participant2 : match.participant1;
+                    };
+
+                    const losers = semiFinals.map(findLoser).filter((p): p is Participant => p !== null);
+                    
+                    if (losers.length === 2) {
+                        const [p1, p2] = losers[0].seed < losers[1].seed ? [losers[0], losers[1]] : [losers[1], losers[0]];
                         newThirdPlaceMatch = { id: 999, roundIndex: -1, matchIndex: 0, participant1: p1, participant2: p2, winner: null, nextMatchId: null };
+                    } else if (losers.length === 1) {
+                        const singleLoser = losers[0];
+                        newThirdPlaceMatch = { 
+                            id: 999, 
+                            roundIndex: -1, 
+                            matchIndex: 0, 
+                            participant1: singleLoser, 
+                            participant2: null, 
+                            winner: singleLoser, 
+                            nextMatchId: null 
+                        };
                     }
                 }
             }
