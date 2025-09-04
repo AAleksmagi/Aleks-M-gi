@@ -217,20 +217,12 @@ const App: React.FC = () => {
                         [nextMatch.participant1, nextMatch.participant2] = [nextMatch.participant2, nextMatch.participant1];
                     }
                 }
-            } else {
-                 const finalMatchIsThisOne = matchToUpdate.roundIndex === newBracket.length - 1;
-                 const thirdPlaceApplicable = newBracket.length > 1 && newBracket[0].length > 1;
-
-                if (finalMatchIsThisOne) {
-                    if (!thirdPlaceApplicable || (newThirdPlaceMatch && newThirdPlaceMatch.winner)) {
-                        newPhase = AppPhase.FINISHED;
-                    }
-                }
             }
+
             const numRounds = newBracket.length;
-            if (numRounds > 1) {
+            if (numRounds > 1 && !newThirdPlaceMatch) {
                 const semiFinals = newBracket[numRounds - 2];
-                if (semiFinals.every(m => m.winner) && !newThirdPlaceMatch) {
+                if (semiFinals.every(m => m.winner)) {
                     const findLoser = (match: Match): Participant | null => {
                         if (!match.participant1 || !match.participant2) {
                             return null;
@@ -255,6 +247,14 @@ const App: React.FC = () => {
                             nextMatchId: null 
                         };
                     }
+                }
+            }
+            
+            const isFinalMatch = matchToUpdate.roundIndex === newBracket.length - 1;
+            if (isFinalMatch) {
+                const thirdPlaceApplicable = newBracket.length > 1 && newBracket[0].length > 1;
+                if (!thirdPlaceApplicable || (newThirdPlaceMatch && newThirdPlaceMatch.winner)) {
+                    newPhase = AppPhase.FINISHED;
                 }
             }
         }
