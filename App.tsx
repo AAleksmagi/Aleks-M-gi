@@ -327,6 +327,22 @@ const App: React.FC = () => {
   const handleResetChampionship = useCallback(() => {
     setAppState(getInitialState());
   }, []);
+
+  const handleRestartWithSameParticipants = useCallback(() => {
+    setAppState(prev => {
+        const newSeasonStandings = prev.standings.map(p => ({
+            id: p.id,
+            name: p.name,
+            pointsPerCompetition: [],
+        }));
+
+        return {
+            ...getInitialState(),
+            standings: newSeasonStandings,
+            totalCompetitions: prev.totalCompetitions,
+        };
+    });
+  }, []);
   
   const handleSetTotalCompetitions = useCallback((count: number) => {
     setAppState(prev => ({...prev, totalCompetitions: count}));
@@ -362,6 +378,7 @@ const App: React.FC = () => {
                 setTotalCompetitions={handleSetTotalCompetitions}
                 competitionsHeld={competitionsHeld}
                 onResetChampionship={handleResetChampionship}
+                onRestartWithSameParticipants={handleRestartWithSameParticipants}
                 sessionId={sessionId}
                 onEnableLiveView={handleEnableLiveView}
             />
