@@ -8,6 +8,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
   const [name, setName] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isRegistered) {
@@ -21,11 +22,11 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      setError('Nimi on kohustuslik.');
+    if (!name.trim() || isSubmitting) {
       return;
     }
     setError('');
+    setIsSubmitting(true);
 
     const trimmedName = name.trim();
 
@@ -49,6 +50,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
 
         if (!response.ok) {
             setError(`Registreerimine ebaõnnestus serveri vea tõttu (${response.status}). Proovi uuesti.`);
+            setIsSubmitting(false);
             return;
         }
         
@@ -57,6 +59,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
     } catch (err) {
         console.error("Registration failed:", err);
         setError('Registreerimine ebaõnnestus võrguvea tõttu. Kontrolli internetiühendust ja proovi uuesti.');
+        setIsSubmitting(false);
     }
   };
 
@@ -91,9 +94,10 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
               {error && <p className="text-red-400 mt-2 text-sm">{error}</p>}
               <button
                 type="submit"
-                className="w-full mt-6 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg text-xl transition duration-300 shadow-lg"
+                disabled={isSubmitting || !name.trim()}
+                className="w-full mt-6 bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg text-xl transition duration-300 shadow-lg"
               >
-                Registreeri
+                {isSubmitting ? 'Registreerin...' : 'Registreeri'}
               </button>
             </form>
           </>

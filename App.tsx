@@ -93,9 +93,12 @@ const App: React.FC = () => {
       if (broadcastTimeoutRef.current) {
         clearTimeout(broadcastTimeoutRef.current);
       }
+      // Debounce state broadcasts to prevent hitting rate limits (429 Too Many Requests) on ntfy.sh,
+      // which can happen if the admin updates scores or other data rapidly.
+      // A 1-second delay provides a good balance between live updates and server health.
       broadcastTimeoutRef.current = window.setTimeout(() => {
         broadcastState(appState);
-      }, 750);
+      }, 1000);
     }
     return () => {
       if (broadcastTimeoutRef.current) {
