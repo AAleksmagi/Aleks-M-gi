@@ -98,7 +98,31 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
 
     useEffect(() => {
+        const fetchInitialState = async () => {
+            try {
+                const response = await fetch(`https://ntfy.sh/${sessionId}/json`);
+                if (!response.ok) {
+                    console.warn(`Could not fetch initial state: ${response.statusText}`);
+                    return;
+                }
+                const ntfyMessage = await response.json();
+                if (ntfyMessage.title === 'AppStateUpdate') {
+                    const newState: AppState = JSON.parse(ntfyMessage.message);
+                    setLiveState(newState);
+                    setConnectionStatus('live');
+                }
+            } catch (e) {
+                console.error("Failed to fetch initial state:", e);
+            }
+        };
+
+        fetchInitialState();
+
         const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse`);
+
+        eventSource.onopen = () => {
+            setConnectionStatus('live');
+        };
 
         eventSource.onmessage = (event) => {
             try {

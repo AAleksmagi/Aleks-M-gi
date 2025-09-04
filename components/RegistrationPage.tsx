@@ -12,9 +12,6 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
   useEffect(() => {
     if (isRegistered) {
       const timer = setTimeout(() => {
-        // Construct a clean URL for the live view to ensure reliability.
-        // Use window.location.replace to prevent adding the registration page to browser history,
-        // which creates a better user experience.
         const liveUrl = `${window.location.origin}${window.location.pathname}?live=${sessionId}`;
         window.location.replace(liveUrl);
       }, 3000);
@@ -40,16 +37,27 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
 
     const newParticipantJson = JSON.stringify(newParticipant);
     
-    await fetch(`https://ntfy.sh/${sessionId}`, {
-        method: 'POST',
-        body: newParticipantJson,
-        headers: {
-            'Title': 'Uus registreerimine: ' + trimmedName,
-            'Tags': 'person_add'
+    try {
+        const response = await fetch(`https://ntfy.sh/${sessionId}`, {
+            method: 'POST',
+            body: newParticipantJson,
+            headers: {
+                'Title': 'Uus registreerimine: ' + trimmedName,
+                'Tags': 'person_add'
+            }
+        });
+
+        if (!response.ok) {
+            setError(`Registreerimine ebaõnnestus serveri vea tõttu (${response.status}). Proovi uuesti.`);
+            return;
         }
-    });
-    
-    setIsRegistered(true);
+        
+        setIsRegistered(true);
+
+    } catch (err) {
+        console.error("Registration failed:", err);
+        setError('Registreerimine ebaõnnestus võrguvea tõttu. Kontrolli internetiühendust ja proovi uuesti.');
+    }
   };
 
   return (

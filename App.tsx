@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppPhase } from './constants';
 import type { Participant, BracketData, Match, ChampionshipStanding, AppState } from './types';
 import QualificationView from './components/QualificationView';
@@ -23,6 +23,7 @@ const getInitialState = (): AppState => {
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(getInitialState);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const broadcastTimeoutRef = useRef<number | null>(null);
 
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const sessionParam = useMemo(() => urlParams.get('session'), [urlParams]);
@@ -88,9 +89,19 @@ const App: React.FC = () => {
   }, [sessionId]);
 
   useEffect(() => {
-      if (sessionId) {
-          broadcastState(appState);
+    if (sessionId) {
+      if (broadcastTimeoutRef.current) {
+        clearTimeout(broadcastTimeoutRef.current);
       }
+      broadcastTimeoutRef.current = window.setTimeout(() => {
+        broadcastState(appState);
+      }, 750);
+    }
+    return () => {
+      if (broadcastTimeoutRef.current) {
+        clearTimeout(broadcastTimeoutRef.current);
+      }
+    };
   }, [appState, sessionId, broadcastState]);
 
 
