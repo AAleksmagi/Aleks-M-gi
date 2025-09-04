@@ -17,15 +17,34 @@ interface AppState {
   competitionsHeld: number;
 }
 
+const LOCAL_STORAGE_KEY = 'dmec-championship-state';
+
+interface PersistedState {
+    standings: ChampionshipStanding[];
+    totalCompetitions: number | null;
+    competitionsHeld: number;
+}
+
 const getInitialState = (): AppState => {
+  let persistedState: PersistedState | null = null;
+  try {
+    const savedStateJSON = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedStateJSON) {
+        persistedState = JSON.parse(savedStateJSON);
+    }
+  } catch (error) {
+      console.error('Error loading state from localStorage:', error);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+  }
+
   return {
     phase: AppPhase.CHAMPIONSHIP_VIEW,
-    standings: [],
     competitionParticipants: [],
     bracket: [],
     thirdPlaceMatch: null,
-    totalCompetitions: null,
-    competitionsHeld: 0,
+    standings: persistedState?.standings ?? [],
+    totalCompetitions: persistedState?.totalCompetitions ?? null,
+    competitionsHeld: persistedState?.competitionsHeld ?? 0,
   };
 };
 
@@ -36,6 +55,19 @@ const App: React.FC = () => {
 
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const sessionParam = useMemo(() => urlParams.get('session'), [urlParams]);
+
+  useEffect(() => {
+    if (appState.phase === AppPhase.CHAMPIONSHIP_VIEW) {
+        const { standings, totalCompetitions, competitionsHeld } = appState;
+        const persistedState: PersistedState = { standings, totalCompetitions, competitionsHeld };
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(persistedState));
+        } catch (error) {
+            console.error('Error saving state to localStorage:', error);
+        }
+    }
+  }, [appState.standings, appState.totalCompetitions, appState.competitionsHeld, appState.phase]);
+
 
   useEffect(() => {
     if (!sessionParam && registrationSessionId) {
@@ -296,7 +328,34 @@ const App: React.FC = () => {
   }, []);
 
   const handleResetChampionship = useCallback(() => {
-    setAppState(getInitialState());
+    if (window.confirm("Oled kindel, et soovid uut hooaega alustada? See kustutab kõik praegused edetabeli andmed.")) {
+        const resetState: AppState = {
+            phase: AppPhase.CHAMPIONSHIP_VIEW,
+            standings: [],
+            competitionParticipants: [],
+            bracket: [],
+            thirdPlaceMatch: null,
+            totalCompetitions: null,
+            competitionsHeld: 0,
+        };
+        const persistedResetState: PersistedState = {
+            standings: [],
+            totalCompetitions: null,
+            competitionsHeld: 0
+        };
+
+        try {
+            // Explicitly set the cleared state in localStorage to ensure reset
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(persistedResetState));
+        } catch (error) {
+            // Fallback to removing the key if setItem fails for any reason
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            console.error('Error saving reset state to localStorage:', error);
+        }
+
+        setAppState(resetState);
+        setRegistrationSessionId(null);
+    }
   }, []);
   
   const handleSetTotalCompetitions = useCallback((count: number) => {
