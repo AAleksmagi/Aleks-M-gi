@@ -93,9 +93,10 @@ const App: React.FC = () => {
       if (broadcastTimeoutRef.current) {
         clearTimeout(broadcastTimeoutRef.current);
       }
-      // Debounce state broadcasts to prevent hitting rate limits (429 Too Many Requests) on ntfy.sh,
-      // which can happen if the admin updates scores or other data rapidly.
-      // A 1-second delay provides a good balance between live updates and server health.
+      // See viivitus (debounce) on kriitilise tähtsusega. See väldib ntfy.sh serveri ülekoormamist
+      // (viga 429 - Too Many Requests), mis juhtub, kui administraator sisestab tulemusi kiiresti.
+      // 1-sekundiline ooteaeg tagab tasakaalu reaalajas uuenduste ja serveri stabiilsuse vahel,
+      // lahendades sellega nii registreerimise kui ka reaalajas vaate probleemide algpõhjuse.
       broadcastTimeoutRef.current = window.setTimeout(() => {
         broadcastState(appState);
       }, 1000);

@@ -98,6 +98,8 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
 
     useEffect(() => {
+        // See funktsioon laeb lehe avamisel kohe viimase salvestatud seisu. See tagab,
+        // et kasutaja näeb koheselt tulemusi ega pea ootama esimest reaalajas uuendust.
         const fetchInitialState = async () => {
             try {
                 const response = await fetch(`https://ntfy.sh/${sessionId}/json`);
