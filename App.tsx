@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { AppPhase } from './constants';
 import type { Participant, BracketData, Match, ChampionshipStanding } from './types';
 import QualificationView from './components/QualificationView';
 import TournamentBracket from './components/TournamentBracket';
 import ChampionshipView from './components/ChampionshipView';
+import RegistrationPage from './components/RegistrationPage';
 
 interface AppState {
   phase: AppPhase;
@@ -30,6 +31,52 @@ const getInitialState = (): AppState => {
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(getInitialState);
+  const [registrationSessionId, setRegistrationSessionId] = useState<string | null>(null);
+
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const sessionParam = useMemo(() => urlParams.get('session'), [urlParams]);
+
+  useEffect(() => {
+    if (!sessionParam && registrationSessionId) {
+        const eventSource = new EventSource(`https://ntfy.sh/${registrationSessionId}/sse`);
+
+        eventSource.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                const newParticipantData = JSON.parse(message.message);
+
+                if (newParticipantData && newParticipantData.id && newParticipantData.name) {
+                    setAppState(prev => {
+                        const isDuplicate = prev.standings.some(p => p.name.toLowerCase() === newParticipantData.name.toLowerCase());
+                        if (isDuplicate) {
+                            console.warn(`Duplicate registration rejected: ${newParticipantData.name}`);
+                            return prev;
+                        }
+
+                        const newParticipant: ChampionshipStanding = {
+                            ...newParticipantData,
+                            pointsPerCompetition: Array(prev.competitionsHeld).fill(0),
+                        };
+
+                        return { ...prev, standings: [...prev.standings, newParticipant] };
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to process registration message:", e);
+            }
+        };
+
+        eventSource.onerror = (err) => {
+            console.error("EventSource failed:", err);
+            eventSource.close();
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }
+  }, [registrationSessionId, sessionParam]);
+
 
   const { phase, standings, competitionParticipants, bracket, thirdPlaceMatch, totalCompetitions, competitionsHeld } = appState;
   
@@ -254,6 +301,14 @@ const App: React.FC = () => {
     setAppState(prev => ({...prev, totalCompetitions: count}));
   }, []);
 
+  const handleEnableRegistration = useCallback(() => {
+    const newSessionId = `dmec-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    setRegistrationSessionId(newSessionId);
+  }, []);
+
+  if (sessionParam) {
+    return <RegistrationPage sessionId={sessionParam} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 sm:p-6 lg:p-8">
@@ -272,6 +327,8 @@ const App: React.FC = () => {
                 setTotalCompetitions={handleSetTotalCompetitions}
                 competitionsHeld={competitionsHeld}
                 onResetChampionship={handleResetChampionship}
+                registrationSessionId={registrationSessionId}
+                onEnableRegistration={handleEnableRegistration}
             />
         )}
         {phase === AppPhase.QUALIFICATION && (

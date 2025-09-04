@@ -9,6 +9,8 @@ interface ChampionshipViewProps {
   setTotalCompetitions: (count: number) => void;
   competitionsHeld: number;
   onResetChampionship: () => void;
+  registrationSessionId: string | null;
+  onEnableRegistration: () => void;
 }
 
 const PointsTable: React.FC<{ title: string; data: Record<string, string | number> }> = ({ title, data }) => (
@@ -41,10 +43,24 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
     totalCompetitions, 
     setTotalCompetitions, 
     competitionsHeld, 
-    onResetChampionship 
+    onResetChampionship,
+    registrationSessionId,
+    onEnableRegistration
 }) => {
     const [newName, setNewName] = useState('');
     const [seasonLengthInput, setSeasonLengthInput] = useState(totalCompetitions?.toString() || '');
+    const [linkCopied, setLinkCopied] = useState(false);
+
+    const registrationLink = registrationSessionId 
+        ? `${window.location.origin}${window.location.pathname}?session=${registrationSessionId}`
+        : '';
+        
+    const copyLink = () => {
+        navigator.clipboard.writeText(registrationLink).then(() => {
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        });
+    };
 
     const addParticipant = () => {
         if (newName.trim()) {
@@ -234,6 +250,41 @@ const ChampionshipView: React.FC<ChampionshipViewProps> = ({
                             Lisa osaleja
                         </button>
                     </div>
+
+                    <div className="my-6 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                        <h3 className="text-lg font-semibold text-blue-300 mb-2">Osalejate registreerimine</h3>
+                        {!registrationSessionId ? (
+                            <>
+                                <p className="text-sm text-gray-400 mb-3">Loo unikaalne link, mida jagada osalejatega, et nad saaksid ise end võistlustele registreerida.</p>
+                                <button
+                                    onClick={onEnableRegistration}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+                                >
+                                    Luba registreerimine
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-gray-400 mb-3">Jaga seda linki osalejatega. Uued registreerujad ilmuvad automaatselt tabelisse.</p>
+                                <div className="flex gap-2 items-center bg-gray-900 p-2 rounded-md">
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={registrationLink}
+                                        className="flex-grow bg-transparent text-gray-300 focus:outline-none"
+                                        aria-label="Registration Link"
+                                    />
+                                    <button
+                                        onClick={copyLink}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-md text-sm transition duration-300"
+                                    >
+                                        {linkCopied ? 'Kopeeritud!' : 'Kopeeri'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     <div className="overflow-x-auto">
                         {standings.length > 0 ? (
                             <table className="w-full min-w-max">

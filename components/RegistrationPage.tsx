@@ -1,17 +1,10 @@
 import React, { useState } from 'react';
-import type { ChampionshipStanding } from '../types';
-
-interface RegistrationState {
-  standings: ChampionshipStanding[];
-  competitionsHeld: number;
-}
 
 interface RegistrationPageProps {
-  initialState: RegistrationState;
   sessionId: string;
 }
 
-const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState, sessionId }) => {
+const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
   const [name, setName] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState('');
@@ -24,27 +17,23 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState, sessi
     }
 
     const trimmedName = name.trim();
-    const isAlreadyRegistered = initialState.standings.some(
-      p => p.name.toLowerCase() === trimmedName.toLowerCase()
-    );
 
-    if (isAlreadyRegistered) {
-      setError('See nimi on juba registreeritud.');
-      return;
-    }
-
-    const newParticipant: ChampionshipStanding = {
+    const newParticipant = {
       id: Date.now(),
       name: trimmedName,
-      pointsPerCompetition: Array(initialState.competitionsHeld).fill(0),
+      pointsPerCompetition: [],
     };
 
     const newParticipantJson = JSON.stringify(newParticipant);
     
     try {
-        await fetch(`https://ntfy.sh/dmec-${sessionId}`, {
+        await fetch(`https://ntfy.sh/${sessionId}`, {
             method: 'POST',
             body: newParticipantJson,
+            headers: {
+                'Title': 'Uus registreerimine: ' + trimmedName,
+                'Tags': 'person_add'
+            }
         });
     } catch (fetchError) {
         console.error("Failed to send registration update:", fetchError);
@@ -55,8 +44,7 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ initialState, sessi
     setIsRegistered(true);
     setError('');
 
-    // Clean up the URL for a better user experience after registration
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    window.history.replaceState(null, '', window.location.pathname);
   };
 
   return (
