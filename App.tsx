@@ -6,7 +6,6 @@ import TournamentBracket from './components/TournamentBracket';
 import ChampionshipView from './components/ChampionshipView';
 import RegistrationPage from './components/RegistrationPage';
 import LiveResultsView from './components/LiveResultsView';
-import ScoreSubmissionPage from './components/ScoreSubmissionPage';
 
 const getInitialState = (): AppState => {
   return {
@@ -28,10 +27,9 @@ const App: React.FC = () => {
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const sessionParam = useMemo(() => urlParams.get('session'), [urlParams]);
   const liveParam = useMemo(() => urlParams.get('live'), [urlParams]);
-  const submitScoreParam = useMemo(() => urlParams.get('submit-score'), [urlParams]);
 
   useEffect(() => {
-    if (!sessionParam && !liveParam && !submitScoreParam && sessionId) {
+    if (!sessionParam && !liveParam && sessionId) {
         const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse`);
 
         eventSource.onmessage = (event) => {
@@ -56,22 +54,14 @@ const App: React.FC = () => {
                             return { ...prev, standings: [...prev.standings, newParticipant] };
                         });
                     }
-                } else if (message.title === 'ScoreSubmission') {
-                    const { participantId, score } = JSON.parse(message.message);
-                    setAppState(prev => {
-                        const updatedParticipants = prev.competitionParticipants.map(p =>
-                            p.id === participantId ? { ...p, score: score } : p
-                        );
-                        return { ...prev, competitionParticipants: updatedParticipants };
-                    });
                 }
             } catch (e) {
-                console.error("Failed to process message:", e);
+                console.error("Failed to process registration message:", e);
             }
         };
 
         eventSource.onerror = (err) => {
-            console.error("Admin view EventSource failed. Event:", err);
+            console.error("EventSource failed:", err);
             eventSource.close();
         };
 
@@ -79,7 +69,7 @@ const App: React.FC = () => {
             eventSource.close();
         };
     }
-  }, [sessionId, sessionParam, liveParam, submitScoreParam]);
+  }, [sessionId, sessionParam, liveParam]);
   
   useEffect(() => {
     if (sessionId) {
@@ -354,10 +344,6 @@ const App: React.FC = () => {
   if (liveParam) {
     return <LiveResultsView sessionId={liveParam} />;
   }
-  
-  if (submitScoreParam) {
-    return <ScoreSubmissionPage sessionId={submitScoreParam} />;
-  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 sm:p-6 lg:p-8">
@@ -383,8 +369,8 @@ const App: React.FC = () => {
         {phase === AppPhase.QUALIFICATION && (
           <QualificationView 
             participants={competitionParticipants} 
+            setParticipants={setCompetitionParticipants}
             onStartBracket={handleStartBracket}
-            sessionId={sessionId}
           />
         )}
         {(phase === AppPhase.BRACKET || phase === AppPhase.FINISHED) && (

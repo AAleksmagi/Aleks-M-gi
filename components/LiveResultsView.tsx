@@ -118,7 +118,7 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
         };
 
         eventSource.onerror = (err) => {
-            console.error("LiveResultsView EventSource failed. Event:", err);
+            console.error("EventSource failed:", err);
             setConnectionStatus('error');
             eventSource.close();
         };
