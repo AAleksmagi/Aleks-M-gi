@@ -36,7 +36,7 @@ const PointsTable: React.FC<{ title: string; data: Record<string, string | numbe
 );
 
 
-export const ChampionshipView: React.FC<ChampionshipViewProps> = ({ 
+const ChampionshipView: React.FC<ChampionshipViewProps> = ({ 
     standings, 
     setStandings, 
     onStartCompetition, 
@@ -181,119 +181,151 @@ export const ChampionshipView: React.FC<ChampionshipViewProps> = ({
         <div className="max-w-7xl mx-auto bg-gray-800 p-6 rounded-lg shadow-xl">
             <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                  <h2 className="text-2xl font-bold text-yellow-300">
-                    Edetabel - Etapp {isSeasonFinished ? totalCompetitions : competitionsHeld + 1}/{totalCompetitions}
-                 </h2>
-                 {!isSeasonFinished && (
-                    <button 
-                        onClick={onStartCompetition} 
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 shadow-md disabled:bg-gray-600 disabled:cursor-not-allowed"
-                        disabled={standings.length < 2}
-                    >
-                        Alusta võistlust
-                    </button>
-                 )}
+                    {isSeasonFinished ? 'Hooaja lõplik edetabel' : 'Meistrivõistluste edetabel'}
+                </h2>
+                <div className="text-lg font-semibold text-gray-400 bg-gray-700 px-4 py-1 rounded-md">
+                   Võistlus {Math.min(competitionsHeld + 1, totalCompetitions)} / {totalCompetitions}
+                </div>
             </div>
 
-            {isSeasonFinished && (
-                <div className="text-center p-8 bg-gray-900/50 rounded-lg mb-8 border border-yellow-500">
-                    <h3 className="text-3xl font-bold text-yellow-400 mb-6">Hooaeg on lõppenud!</h3>
-                    <div className="flex justify-center items-end gap-4">
-                        {second && (
-                            <div className="text-center">
-                                <div className="text-5xl">🥈</div>
-                                <div className="font-bold text-xl mt-2 text-gray-300">{second.name}</div>
-                                <div className="text-gray-400">{getTotalPoints(second)}p</div>
-                            </div>
-                        )}
-                        {first && (
-                             <div className="text-center mx-4">
-                                <div className="text-6xl">🏆</div>
-                                <div className="font-bold text-2xl mt-2 text-yellow-300">{first.name}</div>
-                                <div className="text-yellow-400">{getTotalPoints(first)}p</div>
-                            </div>
-                        )}
-                        {third && (
-                            <div className="text-center">
-                                <div className="text-5xl" style={{ filter: 'saturate(0.8)' }}>🥉</div>
-                                <div className="font-bold text-xl mt-2" style={{ color: '#CD7F32' }}>{third.name}</div>
-                                <div className="text-gray-400">{getTotalPoints(third)}p</div>
-                            </div>
-                        )}
+            {isSeasonFinished ? (
+                <div className="text-center">
+                    {sortedStandings.length > 0 && (
+                         <div className="flex justify-center items-end gap-4 my-8">
+                            {second && (
+                                <div className="flex flex-col items-center opacity-0 animate-podium-item" style={{ animationDelay: '0.4s' }}>
+                                    <div className="text-4xl">🥈</div>
+                                    <div className="font-bold text-xl text-gray-300 mt-1">{second.name}</div>
+                                    <div className="text-lg text-yellow-400">{getTotalPoints(second)} punkti</div>
+                                    <div className="bg-gray-600 w-28 md:w-32 h-24 rounded-t-lg flex items-center justify-center text-2xl font-bold mt-2">2.</div>
+                                </div>
+                            )}
+                            {first && (
+                                <div className="flex flex-col items-center opacity-0 animate-podium-item" style={{ animationDelay: '0.6s' }}>
+                                    <div className="text-5xl">🥇</div>
+                                    <div className="font-bold text-2xl text-yellow-300 mt-1">{first.name}</div>
+                                    <div className="text-xl text-yellow-200">{getTotalPoints(first)} punkti</div>
+                                    <div className="bg-yellow-500 text-gray-900 w-32 md:w-40 h-32 rounded-t-lg flex items-center justify-center text-3xl font-bold mt-2">1.</div>
+                                </div>
+                            )}
+                            {third && (
+                                <div className="flex flex-col items-center opacity-0 animate-podium-item" style={{ animationDelay: '0.2s' }}>
+                                    <div className="text-4xl">🥉</div>
+                                    <div className="font-bold text-xl mt-1" style={{ color: '#CD7F32' }}>{third.name}</div>
+                                    <div className="text-lg" style={{ color: '#A36A3B' }}>{getTotalPoints(third)} punkti</div>
+                                    <div className="w-28 md:w-32 h-20 rounded-t-lg flex items-center justify-center text-2xl font-bold mt-2" style={{ backgroundColor: '#8C5A2B' }}>3.</div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="mt-8 opacity-0 animate-podium-item overflow-x-auto" style={{ animationDelay: '0.8s' }}>
+                        {standings.length > 0 && <hr className="border-gray-600 my-6" />}
+                        <table className="w-full min-w-max">
+                            <TableHeader/>
+                            <tbody>
+                                {sortedStandings.map((p, index) => <TableRow key={p.id} p={p} index={index} />)}
+                            </tbody>
+                        </table>
+                         {standings.length === 0 && (
+                            <p className="text-center text-gray-400 py-4">Hooaeg on lõppenud.</p>
+                         )}
                     </div>
                 </div>
-            )}
+            ) : (
+                <>
+                    <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                        <input
+                            type="text"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
+                            placeholder="Sisesta osaleja nimi sarja lisamiseks"
+                            className="flex-grow bg-gray-700 text-white placeholder-gray-400 border border-gray-600 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        />
+                        <button
+                            onClick={addParticipant}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition duration-300"
+                        >
+                            Lisa osaleja
+                        </button>
+                    </div>
 
-            <div className="overflow-x-auto shadow-md rounded-lg">
-                <table className="w-full text-left">
-                    <TableHeader />
-                    <tbody>
-                        {sortedStandings.map((p, index) => <TableRow key={p.id} p={p} index={index} />)}
-                    </tbody>
-                </table>
-            </div>
-
-            {!isSeasonFinished && (
-                <div className="mt-8 pt-6 border-t border-gray-700">
-                    <h3 className="text-xl font-bold mb-4 text-blue-300">Halda osalejaid</h3>
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <div>
-                            <p className="mb-2 text-gray-400">Lisa uus osaleja</p>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newName}
-                                    onChange={(e) => setNewName(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
-                                    placeholder="Osaleja nimi"
-                                    className="flex-grow bg-gray-700 text-white placeholder-gray-400 border border-gray-600 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                    <div className="my-6 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                        <h3 className="text-lg font-semibold text-blue-300 mb-2">Osalejate registreerimine</h3>
+                        {!registrationSessionId ? (
+                            <>
+                                <p className="text-sm text-gray-400 mb-3">Loo unikaalne link, mida jagada osalejatega, et nad saaksid ise end võistlustele registreerida.</p>
                                 <button
-                                    onClick={addParticipant}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition duration-300"
+                                    onClick={onEnableRegistration}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
                                 >
-                                    Lisa
+                                    Luba registreerimine
                                 </button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <p className="mb-2 text-gray-400">Luba uutel osalejatel liituda lingi kaudu</p>
-                            {registrationSessionId ? (
-                                <div className="flex items-center gap-2 p-2 bg-gray-700/50 rounded-lg">
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-gray-400 mb-3">Jaga seda linki osalejatega. Uued registreerujad ilmuvad automaatselt tabelisse.</p>
+                                <div className="flex gap-2 items-center bg-gray-900 p-2 rounded-md">
                                     <input
                                         type="text"
                                         readOnly
                                         value={registrationLink}
-                                        className="flex-grow bg-gray-900 text-gray-300 border border-gray-600 rounded-md px-3 py-2 text-sm"
+                                        className="flex-grow bg-transparent text-gray-300 focus:outline-none"
+                                        aria-label="Registration Link"
                                     />
                                     <button
                                         onClick={copyLink}
-                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-md text-sm transition duration-300"
                                     >
                                         {linkCopied ? 'Kopeeritud!' : 'Kopeeri'}
                                     </button>
                                 </div>
-                            ) : (
-                                <button
-                                    onClick={onEnableRegistration}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300"
-                                >
-                                    Luba registreerimine
-                                </button>
-                            )}
-                        </div>
+                            </>
+                        )}
                     </div>
-                </div>
+
+                    <div className="overflow-x-auto">
+                        {standings.length > 0 ? (
+                            <table className="w-full min-w-max">
+                                <TableHeader />
+                                <tbody>
+                                    {sortedStandings.map((p, index) => <TableRow key={p.id} p={p} index={index} />)}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <p className="text-center text-gray-400 py-4">
+                               Lisa osalejaid, et alustada meistrivõistlusi.
+                            </p>
+                        )}
+                    </div>
+                </>
             )}
-            
-            <div className="mt-10 pt-6 border-t border-gray-700 text-center">
-                <button
-                    onClick={onResetChampionship}
-                    className="text-gray-400 hover:text-white border border-gray-600 hover:border-red-500 hover:bg-red-500/20 py-2 px-4 rounded-md transition duration-300 text-sm"
-                >
-                    Alusta uut hooaega (kustutab kõik andmed)
-                </button>
+
+            <div className="mt-8 text-center">
+                {isSeasonFinished ? (
+                    <button
+                        onClick={onResetChampionship}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition duration-300 shadow-lg opacity-0 animate-podium-item"
+                        style={{ animationDelay: '1.0s' }}
+                    >
+                        Alusta uut hooaega
+                    </button>
+                ) : (
+                    <>
+                        <button
+                            onClick={onStartCompetition}
+                            disabled={standings.length < 2}
+                            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg text-xl transition duration-300 shadow-lg"
+                        >
+                            Alusta uut võistlust
+                        </button>
+                        {standings.length < 2 && <p className="text-sm mt-2 text-gray-500">Võistluse alustamiseks on vaja vähemalt 2 osalejat.</p>}
+                    </>
+                )}
             </div>
         </div>
     );
 };
+
+export default ChampionshipView;
