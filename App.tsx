@@ -61,8 +61,9 @@ const App: React.FC = () => {
         };
 
         eventSource.onerror = (err) => {
-            console.error("EventSource failed:", err);
-            eventSource.close();
+            // The EventSource API will automatically try to reconnect on errors.
+            // Closing it here would prevent recovery from transient network issues.
+            console.error("EventSource failed. The browser will attempt to reconnect automatically.", err);
         };
 
         return () => {
