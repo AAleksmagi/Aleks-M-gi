@@ -36,7 +36,11 @@ const App: React.FC = () => {
         eventSource.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                if (message.title.startsWith('Uus registreerimine')) {
+                // Only process actual message events, not open/keepalive events
+                if (message.event !== 'message') {
+                    return;
+                }
+                if (message.title && message.title.startsWith('Uus registreerimine')) {
                     const newParticipantData = JSON.parse(message.message);
 
                     if (newParticipantData && newParticipantData.id && newParticipantData.name) {
@@ -88,8 +92,19 @@ const App: React.FC = () => {
     }
   }, [sessionId]);
 
+  // Broadcast initial state immediately when live view is enabled
+  const isInitialBroadcast = useRef(false);
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId && !isInitialBroadcast.current) {
+      // First broadcast happens immediately so late joiners can fetch it
+      broadcastState(appState);
+      isInitialBroadcast.current = true;
+    }
+  }, [sessionId, appState, broadcastState]);
+
+  // Debounced broadcasts for subsequent state changes
+  useEffect(() => {
+    if (sessionId && isInitialBroadcast.current) {
       if (broadcastTimeoutRef.current) {
         clearTimeout(broadcastTimeoutRef.current);
       }

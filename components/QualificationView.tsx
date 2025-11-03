@@ -15,9 +15,16 @@ const QualificationView: React.FC<QualificationViewProps> = ({
 }) => {
 
   const updateScore = (id: number, score: string) => {
-    const scoreValue = score ? parseInt(score, 10) : null;
+    let scoreValue: number | null = null;
+    if (score) {
+      const parsed = parseFloat(score);
+      if (!isNaN(parsed)) {
+        // Round to 2 decimal places
+        scoreValue = Math.round(parsed * 100) / 100;
+      }
+    }
     setParticipants(prev =>
-      prev.map(p => (p.id === id ? { ...p, score: isNaN(scoreValue as number) ? null : scoreValue } : p))
+      prev.map(p => (p.id === id ? { ...p, score: scoreValue } : p))
     );
   };
 
@@ -46,10 +53,11 @@ const QualificationView: React.FC<QualificationViewProps> = ({
               <span className="flex-grow font-semibold text-lg">{p.name}</span>
               <input
                 type="number"
+                step="0.01"
                 placeholder="Tulemus"
                 value={p.score === null ? '' : p.score}
                 onChange={(e) => updateScore(p.id, e.target.value)}
-                className="w-28 bg-gray-600 text-white placeholder-gray-400 border border-gray-500 rounded-md px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-32 bg-gray-600 text-white placeholder-gray-400 border border-gray-500 rounded-md px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           );

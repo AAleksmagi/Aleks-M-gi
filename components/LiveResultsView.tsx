@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { AppState, ChampionshipStanding, Participant } from '../types';
 import { AppPhase } from '../constants';
 import TournamentBracket from './TournamentBracket';
@@ -96,66 +96,153 @@ const LiveStatusIndicator: React.FC<{ status: ConnectionStatus }> = ({ status })
 const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     const [liveState, setLiveState] = useState<AppState | null>(null);
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+    const reconnectTimeoutRef = useRef<number | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
 
     useEffect(() => {
+        let isComponentMounted = true;
+
+        // Helper function to extract state from ntfy message (handles both inline and attachment)
+        const extractStateFromMessage = async (ntfyMessage: any): Promise<AppState | null> => {
+            if (ntfyMessage.event !== 'message' || ntfyMessage.title !== 'AppStateUpdate') {
+                return null;
+            }
+
+            // Check if state is in an attachment (happens when message is too large)
+            if (ntfyMessage.attachment && ntfyMessage.attachment.url) {
+                try {
+                    const attachmentResponse = await fetch(ntfyMessage.attachment.url);
+                    if (!attachmentResponse.ok) {
+                        console.error("Failed to fetch attachment:", attachmentResponse.statusText);
+                        return null;
+                    }
+                    return await attachmentResponse.json();
+                } catch (e) {
+                    console.error("Failed to parse attachment:", e);
+                    return null;
+                }
+            }
+
+            // Otherwise, state is inline in the message field
+            if (ntfyMessage.message) {
+                try {
+                    return JSON.parse(ntfyMessage.message);
+                } catch (e) {
+                    console.error("Failed to parse inline message:", e);
+                    return null;
+                }
+            }
+
+            return null;
+        };
+
         // See funktsioon laeb lehe avamisel kohe viimase salvestatud seisu. See tagab,
         // et kasutaja näeb koheselt tulemusi ega pea ootama esimest reaalajas uuendust.
         const fetchInitialState = async () => {
             try {
-                const response = await fetch(`https://ntfy.sh/${sessionId}/json`);
+                const response = await fetch(`https://ntfy.sh/${sessionId}/json?poll=1`);
                 if (!response.ok) {
+                    // 404 is normal if no messages exist yet - will get updates via SSE
+                    if (response.status === 404) {
+                        console.log("No messages yet, waiting for live updates");
+                        return;
+                    }
                     console.warn(`Could not fetch initial state: ${response.statusText}`);
                     return;
                 }
                 const ntfyMessage = await response.json();
-                if (ntfyMessage.title === 'AppStateUpdate') {
-                    const newState: AppState = JSON.parse(ntfyMessage.message);
+                const newState = await extractStateFromMessage(ntfyMessage);
+                if (newState && isComponentMounted) {
                     setLiveState(newState);
                     setConnectionStatus('live');
                 }
             } catch (e) {
-                console.error("Failed to fetch initial state:", e);
+                // Log but don't show error to user - SSE will provide updates
+                console.log("Could not fetch initial state, waiting for live updates:", e);
             }
+        };
+
+        const connectSSE = () => {
+            if (!isComponentMounted) return;
+
+            const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse`);
+            eventSourceRef.current = eventSource;
+
+            eventSource.onopen = () => {
+                if (isComponentMounted) {
+                    setConnectionStatus('live');
+                }
+            };
+
+            eventSource.onmessage = async (event) => {
+                try {
+                    const ntfyMessage = JSON.parse(event.data);
+                    // Only process actual message events, not open/keepalive events
+                    if (ntfyMessage.event !== 'message') {
+                        return;
+                    }
+                    const newState = await extractStateFromMessage(ntfyMessage);
+                    if (newState && isComponentMounted) {
+                        setLiveState(newState);
+                        setConnectionStatus('live');
+                    }
+                } catch (e) {
+                    console.error("Failed to parse state update:", e);
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                console.error("EventSource failed:", err);
+                eventSource.close();
+
+                if (isComponentMounted) {
+                    setConnectionStatus('connecting');
+                    // Attempt to reconnect after 3 seconds
+                    reconnectTimeoutRef.current = window.setTimeout(() => {
+                        console.log("Attempting to reconnect...");
+                        connectSSE();
+                    }, 3000);
+                }
+            };
         };
 
         fetchInitialState();
-
-        const eventSource = new EventSource(`https://ntfy.sh/${sessionId}/sse`);
-
-        eventSource.onopen = () => {
-            setConnectionStatus('live');
-        };
-
-        eventSource.onmessage = (event) => {
-            try {
-                const ntfyMessage = JSON.parse(event.data);
-                if (ntfyMessage.title === 'AppStateUpdate') {
-                    const newState: AppState = JSON.parse(ntfyMessage.message);
-                    setLiveState(newState);
-                    setConnectionStatus('live');
-                }
-            } catch (e) {
-                console.error("Failed to parse state update:", e);
-            }
-        };
-
-        eventSource.onerror = (err) => {
-            console.error("EventSource failed:", err);
-            setConnectionStatus('error');
-            eventSource.close();
-        };
+        connectSSE();
 
         return () => {
-            eventSource.close();
+            isComponentMounted = false;
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
         };
     }, [sessionId]);
 
     const renderContent = () => {
         if (!liveState) {
             return (
-                <div className="text-center py-20">
-                    <h2 className="text-2xl font-bold text-gray-400">Ootan andmeid...</h2>
-                    <p className="text-gray-500">Veendu, et administraator on võistluse alustanud.</p>
+                <div className="text-center py-20 max-w-2xl mx-auto">
+                    <div className="mb-6">
+                        <svg className="mx-auto h-16 w-16 text-yellow-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-300 mb-3">Ootan andmeid...</h2>
+                    <div className="bg-gray-800/50 rounded-lg p-6 text-left space-y-3">
+                        <p className="text-gray-400">
+                            {connectionStatus === 'live'
+                                ? '✓ Ühendus aktiivne. Ootan esimest uuendust...'
+                                : connectionStatus === 'connecting'
+                                ? '⟳ Ühendan serveriga...'
+                                : '⚠ Ühendus katkes. Proovin uuesti...'}
+                        </p>
+                        <p className="text-gray-500 text-sm">
+                            Kui administraator on võistluse alustanud, näed tulemusi koheselt.
+                            Kui midagi ei ilmu, veendu, et oled õigel lehel või proovi lehte värskendada.
+                        </p>
+                    </div>
                 </div>
             );
         }
