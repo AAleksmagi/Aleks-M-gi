@@ -68,9 +68,23 @@ const RegistrationPage: React.FC<RegistrationPageProps> = ({ sessionId }) => {
       <div className="max-w-md w-full bg-gray-800 p-8 rounded-xl shadow-2xl text-center">
         {isRegistered ? (
           <div>
-            <svg className="mx-auto h-16 w-16 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <style>{`
+              @keyframes leks-success {
+                0% { transform: rotate(0deg) scale(0); opacity: 0; }
+                30% { transform: rotate(180deg) scale(1.3); opacity: 1; }
+                60% { transform: rotate(360deg) scale(1.1); }
+                100% { transform: rotate(540deg) scale(1.1); opacity: 1; }
+              }
+              .leks-success {
+                animation: leks-success 2.5s ease-out forwards;
+                box-shadow: 0 0 40px rgba(34, 197, 94, 0.8);
+              }
+            `}</style>
+            <img
+              src="/leks.png"
+              alt="Success"
+              className="mx-auto h-24 w-24 leks-success rounded-full"
+            />
             <h1 className="text-3xl font-bold text-white mt-4">Edukalt registreeritud!</h1>
             <p className="text-gray-400 mt-2">Sinu nimi on lisatud võistluse nimekirja. Sind suunatakse tulemuste lehele 3 sekundi pärast...</p>
           </div>

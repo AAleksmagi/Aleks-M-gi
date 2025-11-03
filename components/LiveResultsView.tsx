@@ -98,6 +98,8 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
     const reconnectTimeoutRef = useRef<number | null>(null);
     const eventSourceRef = useRef<EventSource | null>(null);
+    const [showEasterEgg, setShowEasterEgg] = useState(false);
+    const [easterEggPosition, setEasterEggPosition] = useState({ x: 50, y: 50 });
 
     useEffect(() => {
         let isComponentMounted = true;
@@ -185,6 +187,14 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                     if (newState && isComponentMounted) {
                         setLiveState(newState);
                         setConnectionStatus('live');
+
+                        // Easter egg: show leks when new update arrives!
+                        setEasterEggPosition({
+                            x: Math.random() * 80 + 10, // 10-90% of screen width
+                            y: Math.random() * 80 + 10, // 10-90% of screen height
+                        });
+                        setShowEasterEgg(true);
+                        setTimeout(() => setShowEasterEgg(false), 2500);
                     }
                 } catch (e) {
                     console.error("Failed to parse state update:", e);
@@ -225,9 +235,21 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
             return (
                 <div className="text-center py-20 max-w-2xl mx-auto">
                     <div className="mb-6">
-                        <svg className="mx-auto h-16 w-16 text-yellow-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
+                        <style>{`
+                            @keyframes leks-spin {
+                                from { transform: rotate(0deg) scale(1); }
+                                50% { transform: rotate(180deg) scale(1.1); }
+                                to { transform: rotate(360deg) scale(1); }
+                            }
+                            .leks-loading {
+                                animation: leks-spin 6s linear infinite;
+                            }
+                        `}</style>
+                        <img
+                            src="/leks.png"
+                            alt="Loading..."
+                            className="mx-auto h-24 w-24 leks-loading rounded-full"
+                        />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-300 mb-3">Ootan andmeid...</h2>
                     <div className="bg-gray-800/50 rounded-lg p-6 text-left space-y-3">
@@ -275,6 +297,41 @@ const LiveResultsView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     return (
         <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 sm:p-6 lg:p-8">
             <LiveStatusIndicator status={connectionStatus} />
+
+            {/* Easter egg: floating leks appears on updates */}
+            {showEasterEgg && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        left: `${easterEggPosition.x}%`,
+                        top: `${easterEggPosition.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                        zIndex: 9999,
+                        pointerEvents: 'none',
+                    }}
+                >
+                    <style>{`
+                        @keyframes leks-float {
+                            0% { transform: rotate(0deg) scale(0); opacity: 0; }
+                            20% { transform: rotate(90deg) scale(1.3); opacity: 1; }
+                            50% { transform: rotate(180deg) scale(1.1); opacity: 1; }
+                            80% { transform: rotate(270deg) scale(1.2); opacity: 0.8; }
+                            100% { transform: rotate(360deg) scale(0); opacity: 0; }
+                        }
+                        .leks-easter-egg {
+                            animation: leks-float 4s ease-out forwards;
+                            box-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+                            border-radius: 50%;
+                        }
+                    `}</style>
+                    <img
+                        src="/leks.png"
+                        alt=""
+                        className="h-32 w-32 leks-easter-egg"
+                    />
+                </div>
+            )}
+
              <header className="text-center mb-8">
                 <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">
                     Salajase pleistaühingu DMEC - Tulemused
